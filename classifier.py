@@ -4,15 +4,15 @@ import torchmetrics
 import pytorch_lightning as pl
 from torch.nn import functional as F
 
-from models import ViT
 from utils import get_model, get_loss, get_optimizer, get_scheduler
+from models.aggregators.transformer import Transformer
 
 
 class ClassifierLightning(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.model = ViT()
+        self.model = Transformer(num_classes=config.num_classes, input_dim=config.input_dim, pool='cls')
         self.criterion = get_loss(config.criterion, config.weight)
 
         self.lr = config.lr
