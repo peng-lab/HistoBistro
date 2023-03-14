@@ -1,3 +1,4 @@
+from .aggregator import *
 from .attentionmil import *
 from .lamil import *
 from .perceiver import *
