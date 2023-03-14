@@ -2,11 +2,11 @@ import dgl
 import random
 import torch
 
-from aggregator.attentionmil import AttentionMIL
-from aggregator.lamil import LAMIL
-from aggregator.perceiver import Perceiver
-from aggregator.transformer import Transformer
-from aggregator.transmil import TransMIL
+from attentionmil import AttentionMIL
+from lamil import LAMIL
+from perceiver import Perceiver
+from transformer import Transformer
+from transmil import TransMIL
 
 
 def test_attentionmil():
