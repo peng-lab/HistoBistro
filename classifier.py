@@ -119,11 +119,12 @@ class ClassifierLightning(pl.LightningModule):
         )
         return [optimizer], [scheduler]
 
-    def training_step(self, batch):
+    def training_step(self, batch, indice):
         x, y = batch
         logits = self.forward(x)
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1)
+        self.lr_schedulers().step()
 
         self.acc_train(preds, y)
         self.log("acc/train", self.acc_train, prog_bar=True)
@@ -131,7 +132,7 @@ class ClassifierLightning(pl.LightningModule):
 
         return loss
 
-    def validation_step(self, batch):
+    def validation_step(self, batch, indice):
         x, y = batch
         logits = self.forward(x)
         loss = F.cross_entropy(logits, y)
@@ -173,7 +174,7 @@ class ClassifierLightning(pl.LightningModule):
 
         return pd.DataFrame(results)
 
-    def test_step(self, batch):
+    def test_step(self, batch, indice):
         x, y, _, patient = batch
         logits = self.forward(x)
         loss = F.cross_entropy(logits, y)
