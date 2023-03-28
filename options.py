@@ -6,7 +6,7 @@ class Options:
         self.parser = argparse.ArgumentParser()
 
         # logging options
-        self.parser.add_argument('--config_file', type=str, help='path to config file')
+        self.parser.add_argument('--config_file', default='/content/idkidc/config.yaml', type=str, help='path to config file')
         self.parser.add_argument('--save_dir', type=str, help='path to save models, outputs, and folds')
         self.parser.add_argument('--project', type=str, help='wandb project name')
         self.parser.add_argument('--name', type=str, help='costum prefix for logging')
