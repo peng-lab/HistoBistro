@@ -1,8 +1,8 @@
 import torch
 import torch.nn as nn
 from einops import repeat
-from aggregator import BaseAggregator
-from model_utils import PreNorm, SinusoidalPositionalEmbedding, Attention, FeedForward
+from models.aggregators import BaseAggregator
+from models.aggregators.model_utils import PreNorm, SinusoidalPositionalEmbedding, Attention, FeedForward
 
 
 class TransformerBlocks(nn.Module):
@@ -93,4 +93,4 @@ class Transformer(BaseAggregator):
         return self.mlp_head(self.norm(x))
 
 transformer = Transformer(num_classes=2)
-transformer(torch.rand(1, 2048))
+transformer(torch.rand(1, 1, 2048))
