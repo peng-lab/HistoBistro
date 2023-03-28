@@ -109,13 +109,13 @@ def main(cfg):
         logger = WandbLogger(
             project=cfg.project,
             name=f'{logging_name}_fold{k}',
-            save_dir=cfg.log_dir,
+            save_dir=cfg.save_dir,
             reinit=True,
             settings=wandb.Settings(start_method='fork'),
         )
 
         csv_logger = CSVLogger(
-            save_dir=cfg.log_dir,
+            save_dir=cfg.save_dir,
             name=f'{logging_name}_fold{k}',
         )
 
@@ -189,3 +189,4 @@ if __name__ == '__main__':
     
     config = argparse.Namespace(**config)
     main(config)
+

@@ -12,6 +12,7 @@ class Options:
         self.parser.add_argument('--name', type=str, help='costum prefix for logging')
         
         # task definition
+        self.parser.add_argument('--task', type=str, help='training task in [binary, multiclass, multilabel]')
         self.parser.add_argument('--target', type=str, help='targets used for training')
         self.parser.add_argument('--cohorts', nargs='+', type=str, help='cohort used for training')
         self.parser.add_argument('--ext_cohorts', nargs='+', type=str, help='cohort used for external validation')
@@ -28,10 +29,13 @@ class Options:
         # training options
         self.parser.add_argument('--folds', type=int, help='number of folds')
         self.parser.add_argument('--num_epochs', type=int, help='number of epochs')
+        self.parser.add_argument('--optimizer', type=str, help='optimizer for model training')
+        self.parser.add_argument('--scheduler', type=str, help='scheduler for model training')
         self.parser.add_argument('--lr', type=float, help='learning rate')
         self.parser.add_argument('--wd', type=float, help='weight decay')
         self.parser.add_argument('--bs', type=int, help='batch size during training')
         self.parser.add_argument('--stop_criterion', type=str, help='metric for choosing best model')
+        self.parser.add_argument('--resume', type=str, help='path to trained model for evaluation')
 
         self.parser.add_argument('--debug', type=bool, help='debug flag, turns off login etc.')
 
