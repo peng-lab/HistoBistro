@@ -225,8 +225,10 @@ MSI_cohorts_munich = {
     },
     'CPTAC': {
         'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_clinical_data.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_slide.csv'),
+        # 'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_clinical_data.xlsx'),
+        # 'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_slide.csv'),
+        'clini_table': Path('/content/drive/MyDrive/PhD/data/clini_tables/coad_cptac_2019_clinical_data.xlsx'),
+        'slide_csv': Path('/content/drive/MyDrive/PhD/data/clini_tables/coad_cptac_2019_slide.csv'),
         'feature_dir': {
             'macenko': {
                 'retccl': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Macenko/RetCCL'),
@@ -235,6 +237,7 @@ MSI_cohorts_munich = {
             'raw': {
                 'retccl': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Raw/RetCCL'), 
                 'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Raw/CPTAC_HistAuGAN_CTransPath/'),
+                'ctranspath': Path('/content/drive/MyDrive/PhD/data/CPTAC_COAD/features/CPTAC_Macenko_CTransPath'),
             },
             'histaugan': {
                 'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Raw/CPTAC_HistAuGAN_CTransPath/'),

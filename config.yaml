@@ -18,7 +18,7 @@ num_classes:
   value: 1
 cohorts:
   desc: cohort used for training
-  value: ["TCGA"]
+  value: ["CPTAC"]
 ext_cohorts:
   desc: cohort used for external validation
   value: ["CPTAC"]
