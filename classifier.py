@@ -13,16 +13,11 @@ class ClassifierLightning(pl.LightningModule):
         super().__init__()
         self.config = config
         self.model = Transformer(num_classes=config.num_classes, input_dim=config.input_dim, pool='cls')
-        self.criterion = get_loss(config.criterion, config.weight)
+        self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight)
 
         self.lr = config.lr
         self.wd = config.wd
-        self.num_steps = config.num_steps
-        
-        self.outputs
-
-        # TODO: implement model loading with argument parser
-
+        # self.num_steps = config.num_steps
 
         self.acc_train = torchmetrics.Accuracy(
             task=config.task, 
@@ -39,67 +34,48 @@ class ClassifierLightning(pl.LightningModule):
 
         self.auroc_val = torchmetrics.AUROC(
             task=config.task,
-            threshold=config.threshold,
             num_classes=config.num_classes,
-            average=config.average
         )
         self.auroc_test = torchmetrics.AUROC(
             task=config.task,
-            threshold=config.threshold,
             num_classes=config.num_classes,
-            average=config.average
         )
 
         self.f1_val = torchmetrics.F1Score(
             task=config.task,
-            threshold=config.threshold,
             num_classes=config.num_classes,
-            average=config.average
         )
         self.f1_test = torchmetrics.F1Score(
             task=config.task,
-            threshold=config.threshold,
             num_classes=config.num_classes,
-            average=config.average
         )
 
         self.precision_val = torchmetrics.Precision(
             task=config.task,
-            threshold=config.threshold,
             num_classes=config.num_classes,
-            average=config.average
         )
         self.precision_test = torchmetrics.Precision(
             task=config.task,
-            threshold=config.threshold,
             num_classes=config.num_classes,
-            average=config.average
         )
 
         self.recall_val = torchmetrics.Recall(
             task=config.task,
-            threshold=config.threshold,
             num_classes=config.num_classes,
-            average=config.average
         )
+        
         self.recall_test = torchmetrics.Recall(
             task=config.task,
-            threshold=config.threshold,
             num_classes=config.num_classes,
-            average=config.average
         )
 
         self.specificity_val = torchmetrics.Specificity(
             task=config.task,
-            threshold=config.threshold,
             num_classes=config.num_classes,
-            average=config.average
         )
         self.specificity_test = torchmetrics.Specificity(
             task=config.task,
-            threshold=config.threshold,
             num_classes=config.num_classes,
-            average=config.average
         )
 
     def forward(self, x):
@@ -113,18 +89,18 @@ class ClassifierLightning(pl.LightningModule):
             lr=self.lr,
             wd=self.wd
         )
-        scheduler = self.scheduler(
-            name=self.config.scheduler,
-            optimizer=optimizer, 
-        )
-        return [optimizer], [scheduler]
+        # scheduler = self.scheduler(
+        #     name=self.config.scheduler,
+        #     optimizer=optimizer, 
+        # )
+        return [optimizer] # , [scheduler]
 
     def training_step(self, batch, indice):
-        x, y = batch
+        x, coords, y, tiles, _ = batch  # x=features, y=labels
         logits = self.forward(x)
         loss = self.criterion(logits, y)
-        preds = torch.argmax(logits, dim=1)
-        self.lr_schedulers().step()
+        preds = torch.argmax(logits, dim=1, keepdim=True)
+        # self.lr_schedulers().step()
 
         self.acc_train(preds, y)
         self.log("acc/train", self.acc_train, prog_bar=True)
@@ -133,10 +109,10 @@ class ClassifierLightning(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, indice):
-        x, y = batch
+        x, coords, y, tiles, patient = batch  # x=features, y=labels
         logits = self.forward(x)
         loss = F.cross_entropy(logits, y)
-        preds = torch.argmax(logits, dim=1)
+        preds = torch.argmax(logits, dim=1, keepdim=True)
 
         self.acc_val(preds, y)
         self.auroc_val(preds, y)
@@ -175,10 +151,10 @@ class ClassifierLightning(pl.LightningModule):
         return pd.DataFrame(results)
 
     def test_step(self, batch, indice):
-        x, y, _, patient = batch
+        x, coords, y, tiles, patient = batch  # x=features, y=labels
         logits = self.forward(x)
         loss = F.cross_entropy(logits, y)
-        preds = torch.argmax(logits, dim=1)
+        preds = torch.argmax(logits, dim=1, keepdim=True)
         
         self.acc_test(preds, y)
         self.auroc_test(preds, y)
@@ -216,3 +192,4 @@ class ClassifierLightning(pl.LightningModule):
 
         return pd.DataFrame(results)
         
+

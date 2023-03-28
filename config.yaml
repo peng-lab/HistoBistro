@@ -10,6 +10,9 @@ name:
   value: test
 
 # task definition
+task:
+  desc: training task in ['binary', 'multiclass', 'multilabel']
+  value: binary
 target:
   desc: targets used for training
   value: isMSIH
@@ -56,6 +59,12 @@ folds:
 num_epochs:
   desc: number of epochs
   value: 32
+optimizer:
+  desc: optimizer for model training
+  value: AdamW
+scheduler:
+  desc: scheduler for model training
+  value: null
 lr:
   desc: learning rate
   value: 2.0e-05
@@ -68,6 +77,9 @@ bs:
 stop_criterion:
   desc: metric for choosing best model
   value: loss
+resume:
+  desc: path to trained model for evaluation
+  value: null
 debug:
   desc: debug flag, turns off login etc.
   value: false
