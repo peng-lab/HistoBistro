@@ -1,18 +1,18 @@
-import feature_extractors.ResNet as ResNet
-from feature_extractors.ccl import CCL
+#import feature_extractors.ResNet as ResNet
 import torch.nn as nn
 import torch
 
+import resnet
 #import requests
 from pathlib import Path
 from torchvision import transforms
-from feature_extractors.ctran import ctranspath
+#from feature_extractors.ctran import ctranspath
 #from PIL import Image
 import torchvision.models as models
 
 
 # RetCCL can be downloaded here: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL?usp=sharing
-RETCCL_PATH = '/lustre/groups/shared/users/peng_marr/pretrained_models/RetCCL'
+RETCCL_PATH = '/mnt/volume/retccl.pth'
 CTRANSPATH_PATH= '/lustre/groups/shared/users/peng_marr/pretrained_models/CTransPath/ctranspath.pth'
 
 def get_models(modelnames):
@@ -34,14 +34,10 @@ def get_models(modelnames):
 
 
 def get_retCCL():
-    backbone = ResNet.resnet50
-    model = CCL(backbone, 128, 65536, mlp=True, two_branch=True, normlinear=True).cuda()
+    model = resnet.resnet50(num_classes=128,mlp=False, two_branch=False, normlinear=True)
     pretext_model = torch.load(RETCCL_PATH)
+    model.fc = nn.Identity()
     model.load_state_dict(pretext_model, strict=True)
-    model.encoder_q.fc = nn.Identity()
-    model.encoder_q.instDis = nn.Identity()
-    model.encoder_q.groupDis = nn.Identity()
-    model.eval()
     return model
 
 def get_ctranspath():
@@ -50,7 +46,6 @@ def get_ctranspath():
     pretrained = torch.load(CTRANSPATH_PATH)
     model.load_state_dict(pretrained['model'], strict=True)
     model=torch.compile(model)
-    model.eval()
     return model
     
 def kimianet():

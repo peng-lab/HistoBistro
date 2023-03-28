@@ -13,11 +13,11 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Feature extraction')
 
-parser.add_argument('--slide_path', help='path of slides to extract features from', default='/lustre/groups/labs/marr/qscd01/datasets/heart_center_munich', type=str)
+parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/volume/raw_data/AIT', type=str)
 parser.add_argument('--save_path', help='path to save everything', default='.', type=str)
 parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
-parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['retccl','resnet50'], type=str)
-parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0], type=int)
+parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['retccl'], type=str)
+parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0,1], type=int)
 parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=False, type=bool)
 parser.add_argument('--patch_size', help='Patch size for saving', default=256, type=int)
 parser.add_argument('--border_map', help='Set true or false for creating thumbnails with highlighted extracted patched', default=True, type=bool)
@@ -26,10 +26,10 @@ parser.add_argument('--black_thresh', help='if all RGB pixel values are smaller 
 parser.add_argument('--invalid_ratio_thresh', help='True if each patch should be saved as an image', default=0.5, type=float)
 parser.add_argument('--edge_threshold', help='canny edge detection threshold. if smaller than this value, patch gets discarded', default=4, type=int)
 parser.add_argument('--resolution_in_mpp', help='resolution in mpp, usually 10x= 1mpp, 20x=0.5mpp, 40x=0.25, ', default=0, type=float)
-parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=2, type=float)
+parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float)
 parser.add_argument('--BGR_to_RGB', help='set True if your input has BGR format', default=True, type=bool)
 parser.add_argument('--save_tile_preview', help='set True if you want nice pictures', default=True, type=bool)
-parser.add_argument('--preview_size', help='size of tile_preview', default=4048, type=int)
+parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)
 
 #/lustre/groups/haicu/datasets/histology_data/TCGA/CRC/slides
 
@@ -76,7 +76,7 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device,BGR_to
     feats=[]
     coords = pd.DataFrame({'scene' : [], 'x' : [], 'y' : []}) 
 
-    for scn in scene_list:
+    for scn in range(slide.num_scenes):
         wsi_copy=None
         scene=slide.get_scene(scn)
         scaling=get_scaling(args,scene.resolution[0])
@@ -127,8 +127,20 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device,BGR_to
 
         if args.save_tile_preview:
             preview_im=Image.fromarray(wsi_copy)
-            aspect_ratio = preview_im.size[1] / preview_im.size[0]
-            preview_im = preview_im.resize((args.preview_size, int(args.preview_size / aspect_ratio))) if preview_im.size[0] > preview_im.size[1] else preview_im.resize((int(args.preview_size / aspect_ratio), args.preview_size))        
+            preview_size = int(args.preview_size)
+            width, height = preview_im.size
+            aspect_ratio = height / width
+
+            if aspect_ratio > 1:
+                # Height needs to be adjusted
+                new_height = preview_size
+                new_width = int(preview_size / aspect_ratio)
+            else:
+                # Width needs to be adjusted
+                new_width = preview_size
+                new_height = int(preview_size * aspect_ratio)
+
+            preview_im = preview_im.resize((new_width, new_height))
             preview_im.save(Path(args.save_path) / 'tiling_previews'/ f'{slide_name}_{scn}.png')
 
     # Write data to HDF5
