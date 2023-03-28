@@ -5,4 +5,4 @@ from .perceiver import *
 from .transformer import *
 from .transmil import *
 
-from model_utils import *
+# from model_utils import *

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from aggregator import BaseAggregator
-from model_utils import MILAttention
+from models.aggregators import BaseAggregator
+from models.aggregators.model_utils import MILAttention
 from typing import Optional
 
 

@@ -1,8 +1,8 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from aggregator import BaseAggregator
-from model_utils import PPEG, NystromTransformerLayer
+from models.aggregators import BaseAggregator
+from models.aggregators.model_utils import PPEG, NystromTransformerLayer
 
 
 class TransMIL(BaseAggregator):
