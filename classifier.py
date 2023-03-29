@@ -139,7 +139,7 @@ class ClassifierLightning(pl.LightningModule):
         
         return outputs
         
-    def val_epoch_end(self, outputs):
+    def on_val_epoch_end(self, outputs):
         results = {
             'patient': torch.stack([x['patient'] for x in outputs]).cpu().numpy(),
             'ground_truth': torch.stack([x['ground_truth'] for x in outputs]).cpu().numpy(),
@@ -150,7 +150,9 @@ class ClassifierLightning(pl.LightningModule):
 
         return pd.DataFrame(results)
 
-    def test_step(self, batch, indice):
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        print('hi')
+        print(dataloader_idx)
         x, coords, y, tiles, patient = batch  # x=features, y=labels
         logits = self.forward(x)
         loss = F.cross_entropy(logits, y)
@@ -163,31 +165,34 @@ class ClassifierLightning(pl.LightningModule):
         self.recall_test(preds, y)
         self.specificity_test(preds, y)
         
-        self.log("acc/test", self.acc_test, prog_bar=True)
-        self.log("auroc/test", self.auroc_test, prog_bar=False)
-        self.log("f1/test", self.f1_test, prog_bar=True)
-        self.log("loss/test", loss, prog_bar=False)
-        self.log("precision/test", self.precision_test, prog_bar=False)
-        self.log("recall/test", self.recall_test, prog_bar=False)
-        self.log("specificity/test", self.specificity_test, prog_bar=False)
+        self.log(f'acc/test_{dataloader_idx}', self.acc_test, prog_bar=True)
+        self.log(f'auroc/test_{dataloader_idx}', self.auroc_test, prog_bar=False)
+        self.log(f'f1/test_{dataloader_idx}', self.f1_test, prog_bar=True)
+        self.log(f'loss/test_{dataloader_idx}', loss, prog_bar=False)
+        self.log(f'precision/test_{dataloader_idx}', self.precision_test, prog_bar=False)
+        self.log(f'recall/test_{dataloader_idx}', self.recall_test, prog_bar=False)
+        self.log(f'specificity/test_{dataloader_idx}', self.specificity_test, prog_bar=False)
         
         outputs = {
-            'patient': patient,
-            'ground_truth': y,
-            'predictions': preds,
-            'logits': logits,
-            'correct': y == preds,
+            dataloader_idx: {
+                'patient': patient,
+                'ground_truth': y,
+                'predictions': preds,
+                'logits': logits,
+                'correct': y == preds,
+            }
         }
         
         return outputs
         
-    def test_epoch_end(self, outputs):
+    def on_test_end(self, x, dataloader_idx=0):
+        print(x)
         results = {
-            'patient': torch.stack([x['patient'] for x in outputs]).cpu().numpy(),
-            'ground_truth': torch.stack([x['ground_truth'] for x in outputs]).cpu().numpy(),
-            'predictions': torch.stack([x['predictions'] for x in outputs]).cpu().numpy(),
-            'logits': torch.stack([x['logits'] for x in outputs]).cpu().numpy(),
-            'correct': torch.stack([x['correct'] for x in outputs]).cpu().numpy(),
+            'patient': torch.stack([x[dataloader_idx]['patient'] for x in outputs]).cpu().numpy(),
+            'ground_truth': torch.stack([x[dataloader_idx]['ground_truth'] for x in outputs]).cpu().numpy(),
+            'predictions': torch.stack([x[dataloader_idx]['predictions'] for x in outputs]).cpu().numpy(),
+            'logits': torch.stack([x[dataloader_idx]['logits'] for x in outputs]).cpu().numpy(),
+            'correct': torch.stack([x[dataloader_idx]['correct'] for x in outputs]).cpu().numpy(),
         }
 
         return pd.DataFrame(results)
