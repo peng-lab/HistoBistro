@@ -1,7 +1,7 @@
 # logging options
 save_dir:
   desc: path to save models, outputs, and folds
-  value: /lustre/groups/peng/workspace/sophia.wagner/logs/hackathon/
+  value: /content/logs
 project:
   desc: wandb project name
   value: hackathon
@@ -58,7 +58,7 @@ folds:
   value: 5
 num_epochs:
   desc: number of epochs
-  value: 32
+  value: 8
 optimizer:
   desc: optimizer for model training
   value: AdamW

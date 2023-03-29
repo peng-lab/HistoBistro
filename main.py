@@ -22,12 +22,14 @@ def main(cfg):
 
     # saving locations
     base_path = Path(cfg.save_dir)  # adapt to own target path
-    logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{"-".join(cfg.target_labels)}' if not cfg.debug else 'debug'
+    logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if not cfg.debug else 'debug'
     base_path = base_path / logging_name
     base_path.mkdir(parents=True, exist_ok=True)
     model_path = base_path / 'models'
     fold_path = base_path / 'folds'
     fold_path.mkdir(parents=True, exist_ok=True)
+    result_path = base_path / 'results'
+    result_path.mkdir(parents=True, exist_ok=True)
 
     norm_val = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
     norm_test = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
@@ -82,7 +84,7 @@ def main(cfg):
         np.savetxt(fold_path / f'folds_{logging_name}_fold{k}_val.csv', val_idxs, delimiter=',')
         print(f'num validation samples in fold {k}: {len(val_dataset)}')
         val_dataloader = DataLoader(
-            dataset=val_dataset, batch_size=cfg.bs, shuffle=True, pin_memory=True
+            dataset=val_dataset, batch_size=cfg.bs, shuffle=False, pin_memory=True
         )
 
         # test dataset (in-domain)
@@ -115,8 +117,8 @@ def main(cfg):
         )
 
         csv_logger = CSVLogger(
-            save_dir=cfg.save_dir,
-            name=f'{logging_name}_fold{k}',
+            save_dir=result_path,
+            name=f'fold{k}',
         )
 
         # --------------------------------------------------------
