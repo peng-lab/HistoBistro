@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torchvision.models as models
 from torchvision import transforms
 
 from torchvision.models import resnet
@@ -53,7 +52,7 @@ def get_kimianet():
 
 def get_res50():
 
-    model = models.resnet50(weights='ResNet50_Weights.DEFAULT')
+    model = resnet.resnet50(weights='ResNet50_Weights.DEFAULT')
     class Reshape(nn.Module):
         def forward(self, x):
             return x.reshape(x.shape[0], -1)
