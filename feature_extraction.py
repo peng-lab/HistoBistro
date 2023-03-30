@@ -1,22 +1,25 @@
-import pandas as pd
-from PIL import Image
-import h5py
-import slideio
-import numpy as np
-import cv2
-from hackathon_models import get_models
-from pathlib import Path
-import torch
-from tqdm import tqdm
 import argparse
+import json
+from pathlib import Path
 
+import cv2
+import h5py
+import numpy as np
+import pandas as pd
+import slideio
+import torch
+from PIL import Image
+from tqdm import tqdm
+
+from models.models import get_models
+from utils.utils import bgr_format, get_driver, get_scaling
 
 parser = argparse.ArgumentParser(description='Feature extraction')
 
 parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/volume/raw_data/AIT', type=str)
 parser.add_argument('--save_path', help='path to save everything', default='.', type=str)
 parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
-parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['retccl'], type=str)
+parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['kimianet','resnet50'], type=str)
 parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0,1], type=int)
 parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=False, type=bool)
 parser.add_argument('--patch_size', help='Patch size for saving', default=256, type=int)
@@ -31,7 +34,6 @@ parser.add_argument('--BGR_to_RGB', help='set True if your input has BGR format'
 parser.add_argument('--save_tile_preview', help='set True if you want nice pictures', default=True, type=bool)
 parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)
 
-#/lustre/groups/haicu/datasets/histology_data/TCGA/CRC/slides
 
 def main(args):
 
@@ -47,7 +49,9 @@ def main(args):
         model_name=model['name']
         save_dir = (Path(args.save_path) / 'h5_files' / 
             f'{args.patch_size}px_{model_name}_{args.resolution_in_mpp}mpp_{args.downscaling_factor}xdown_normal')
+        
         save_dir.mkdir(parents=True, exist_ok=True)
+
         # Create a dictionary of argument names and values
         arg_dict = vars(args)
 
@@ -67,6 +71,7 @@ def main(args):
             extract_features(slide, slide_name, args, model_dict,args.scene_list, device, args.BGR_to_RGB)
 
 
+
 def extract_features(slide, slide_name,args, model_dict,scene_list,device,BGR_to_RGB): 
 
     model=model_dict['model']
@@ -83,7 +88,7 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device,BGR_to
         wsi=scene.read_block(size=(int(scene.size[0]//scaling), int(scene.size[1]//scaling)))
         wsi=np.transpose(wsi, (1, 0, 2))
         
-        if BGR_to_RGB:
+        if bgr_format(slide.raw_metadata):
             wsi = wsi[..., ::-1]
             print("! Changed BGR to RGB !")
 
@@ -101,7 +106,6 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device,BGR_to
                 patch = wsi[x:x+args.patch_size, y:y+args.patch_size, :]
             
                 if threshold(patch,args):
-                    #extract patch
                     im=Image.fromarray(patch)
 
                     if args.save_patch_images:
@@ -112,10 +116,7 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device,BGR_to
                             
                         img_t = transform(im)
 
-                        # If the patch has a fitting shape, add it to the batch
                         batch_t = img_t.unsqueeze(0).to(device)
-
-                        # If the batch is full or this is the last patch, process it
                         features = model(batch_t)
                         feats.append(features)
                         coords=pd.concat([coords, pd.DataFrame({'scn': [scn], 'x': [x], 'y': [y]})],ignore_index=True)
@@ -148,6 +149,9 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device,BGR_to
         
         f['coords'] = coords
         f['feats'] = torch.concat(feats, dim=0).cpu().numpy()
+        f['args']=json.dumps(vars(args))
+        #f['downscaling_factor']=args.downscaling_factor
+        f['model_name']=model_name
 
         print(f['coords'].shape)
         print(f['feats'].shape)
@@ -177,20 +181,6 @@ def threshold(patch,args):
         return False
 
 
-def get_driver(extension_name):
-    if extension_name in['.tiff','.jpg','.jpeg','.png','.tif']:
-        return 'GDAL'
-    elif extension_name=='':
-        return 'DICOM'
-    else:
-        return extension_name.replace('.','').upper()
-    
-def get_scaling(args,mpp_resolution_slide):
-    if args.downscaling_factor>0:
-        return args.downscaling_factor
-    else:
-        return args.resolution_in_mpp/(mpp_resolution_slide*1e06)
-    
 if __name__=='__main__':
     args = parser.parse_args() 
     print('dd')

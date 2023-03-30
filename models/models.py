@@ -2,18 +2,20 @@
 import torch.nn as nn
 import torch
 
-import resnet
-#import requests
+import models.resnet as resnet
+from models.ctran import ctranspath
 from pathlib import Path
 from torchvision import transforms
 #from feature_extractors.ctran import ctranspath
 #from PIL import Image
 import torchvision.models as models
-
+from models.kimianet import load_kimianet
 
 # RetCCL can be downloaded here: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL?usp=sharing
-RETCCL_PATH = '/mnt/volume/retccl.pth'
-CTRANSPATH_PATH= '/lustre/groups/shared/users/peng_marr/pretrained_models/CTransPath/ctranspath.pth'
+#kimianet download: https://kimialab.uwaterloo.ca/kimia/?smd_process_download=1&download_id=4216 
+RETCCL_PATH = '/mnt/volume/models/retccl.pth'
+CTRANSPATH_PATH= '/mnt/volume/models/ctranspath.pth'
+KIMIANET_PATH='/mnt/volume/models/KimiaNetPyTorchWeights.pth'
 
 def get_models(modelnames):
     models=[]
@@ -25,6 +27,8 @@ def get_models(modelnames):
             model= get_ctranspath()
         elif modelname.lower()=='resnet50':
             model=get_res50()
+        elif modelname.lower()=="kimianet":
+            model=get_kimianet()
         model.to(device)
         model=torch.compile(model)
         model.eval()
@@ -45,15 +49,14 @@ def get_ctranspath():
     model.head = nn.Identity()
     pretrained = torch.load(CTRANSPATH_PATH)
     model.load_state_dict(pretrained['model'], strict=True)
-    model=torch.compile(model)
     return model
     
-def kimianet():
-    pass
+def get_kimianet():
+    return load_kimianet(KIMIANET_PATH)
 
 def get_res50():
 
-    model = models.resnet50(pretrained=True)
+    model = models.resnet50(weights='ResNet50_Weights.DEFAULT')
     class Reshape(nn.Module):
         def forward(self, x):
             return x.reshape(x.shape[0], -1)
@@ -71,6 +74,8 @@ def get_transforms(model_name):
         resolution=224
     elif model_name.lower()=='retccl':
         resolution=256
+    elif model_name.lower()=='kimianet':
+        resolution=1000
     else: 
         raise ValueError('Model name not found')
     
