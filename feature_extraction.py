@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 import cv2
+import time
 import h5py
 import numpy as np
 import pandas as pd
@@ -11,15 +12,15 @@ import torch
 from PIL import Image
 from tqdm import tqdm
 
-from models.models import get_models
-from utils.utils import bgr_format, get_driver, get_scaling
+from models.model import get_models
+from utils.utils import bgr_format, get_driver, get_scaling, threshold, append_to_csv_file
 
 parser = argparse.ArgumentParser(description='Feature extraction')
 
 parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/volume/raw_data/AIT', type=str)
 parser.add_argument('--save_path', help='path to save everything', default='.', type=str)
 parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
-parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['kimianet','resnet50'], type=str)
+parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['kimianet','resnet50','retccl','ctranspath'], type=str)
 parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0,1], type=int)
 parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=False, type=bool)
 parser.add_argument('--patch_size', help='Patch size for saving', default=256, type=int)
@@ -71,9 +72,8 @@ def main(args):
             extract_features(slide, slide_name, args, model_dict,args.scene_list, device, args.BGR_to_RGB)
 
 
-
 def extract_features(slide, slide_name,args, model_dict,scene_list,device,BGR_to_RGB): 
-
+    time0=time.time()
     model=model_dict['model']
     transform=model_dict['transforms']
     model_name=model_dict['name']
@@ -150,36 +150,12 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device,BGR_to
         f['coords'] = coords
         f['feats'] = torch.concat(feats, dim=0).cpu().numpy()
         f['args']=json.dumps(vars(args))
-        #f['downscaling_factor']=args.downscaling_factor
         f['model_name']=model_name
 
         print(f['coords'].shape)
         print(f['feats'].shape)
-                            
-
-def threshold(patch,args):
-    whiteish_pixels = np.count_nonzero((patch[:, :, 0] > args.white_thresh) & (patch[:, :, 1] > args.white_thresh) & (patch[:, :, 2] > args.white_thresh))
-    black_pixels = np.count_nonzero((patch[:, :, 0] <= args.black_thresh) & (patch[:, :, 1] <= args.black_thresh) & (patch[:, :, 2] <= args.black_thresh))
-    
-    # Compute the ratio of foreground pixels to total pixels in the patch
-    invalid_ratio = (whiteish_pixels + black_pixels) / (patch.shape[0] * patch.shape[1])
-
-    if invalid_ratio<=args.invalid_ratio_thresh:
-
-        edge  = cv2.Canny(patch, 40, 100) 
-        if np.max(edge) > 0:
-            edge = np.mean(edge) * 100 / np.max(edge)
-        else:
-            edge = 0
-
-        if (edge < args.edge_threshold) or np.isnan(edge):   
-            return False
-        else:
-            return True
-        
-    else: 
-        return False
-
+        print(time.time()-time0, " seconds for extraction")                    
+        append_to_csv_file("timesp.csv",time.time()-time0)
 
 if __name__=='__main__':
     args = parser.parse_args() 

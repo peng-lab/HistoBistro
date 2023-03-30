@@ -1,15 +1,12 @@
-#import feature_extractors.ResNet as ResNet
-import torch.nn as nn
 import torch
-
-import models.resnet as resnet
-from models.ctran import ctranspath
-from pathlib import Path
-from torchvision import transforms
-#from feature_extractors.ctran import ctranspath
-#from PIL import Image
+import torch.nn as nn
 import torchvision.models as models
+from torchvision import transforms
+
+from torchvision.models import resnet
+from models.ctran import ctranspath
 from models.kimianet import load_kimianet
+from models.resnet_retccl import resnet50 as retccl_res50
 
 # RetCCL can be downloaded here: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL?usp=sharing
 #kimianet download: https://kimialab.uwaterloo.ca/kimia/?smd_process_download=1&download_id=4216 
@@ -38,7 +35,7 @@ def get_models(modelnames):
 
 
 def get_retCCL():
-    model = resnet.resnet50(num_classes=128,mlp=False, two_branch=False, normlinear=True)
+    model = retccl_res50(num_classes=128,mlp=False, two_branch=False, normlinear=True)
     pretext_model = torch.load(RETCCL_PATH)
     model.fc = nn.Identity()
     model.load_state_dict(pretext_model, strict=True)
