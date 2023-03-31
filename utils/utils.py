@@ -147,22 +147,22 @@ def save_tile_preview(args, slide_name, scn, preview_im):
                     f'{slide_name}_{scn}.png')
 
 
-def save_hdf5(args, slide_name, model_name, coords, feats):
+def save_hdf5(args, slide_name, coords, feats):
     """
     Save the extracted features and coordinates to an HDF5 file.
 
     Args:
         args (argparse.Namespace): Arguments containing various processing parameters.
         slide_name (str): Name of the slide file.
-        model_name (str): Name of the model used for feature extraction.
         coords (pd.DataFrame): Coordinates of the extracted patches.
-        feats (list): Extracted features.
+        feats (dict): dictionary: modelname: extracted features
 
     Returns:
         None
     """
-    with h5py.File(Path(args.save_path) / 'h5_files' / f'{args.patch_size}px_{model_name}_{args.resolution_in_mpp}mpp_{args.downscaling_factor}xdown_normal' / f'{slide_name}.h5', 'w') as f:
-        f['coords'] = coords.astype('float64')
-        f['feats'] = torch.cat(feats, dim=0).cpu().numpy()
-        f['args'] = json.dumps(vars(args))
-        f['model_name'] = model_name
+    for model_name, features in feats.items():
+        with h5py.File(Path(args.save_path) / 'h5_files' / f'{args.patch_size}px_{model_name}_{args.resolution_in_mpp}mpp_{args.downscaling_factor}xdown_normal' / f'{slide_name}.h5', 'w') as f:
+            f['coords'] = coords.astype('float64')
+            f['feats'] = torch.cat(features, dim=0).cpu().numpy()
+            f['args'] = json.dumps(vars(args))
+            f['model_name'] = model_name

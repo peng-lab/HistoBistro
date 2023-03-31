@@ -19,9 +19,9 @@ parser = argparse.ArgumentParser(description='Feature extraction')
 parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/volume/raw_data/AIT', type=str)
 parser.add_argument('--save_path', help='path to save everything', default='.', type=str)
 parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
-parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['kimianet'], type=str)
+parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['kimianet','resnet50'], type=str)
 parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0,1], type=int)
-parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=True, type=bool)
+parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=False, type=bool)
 parser.add_argument('--patch_size', help='Patch size for saving', default=256, type=int)
 parser.add_argument('--white_thresh', help='if all RGB pixel values are larger than this value, the pixel is considered as white/background', default=170, type=int)
 parser.add_argument('--black_thresh', help='if all RGB pixel values are smaller or equal than this value, the pixel is considered as black/background', default=0, type=str)
@@ -29,7 +29,6 @@ parser.add_argument('--invalid_ratio_thresh', help='True if each patch should be
 parser.add_argument('--edge_threshold', help='canny edge detection threshold. if smaller than this value, patch gets discarded', default=4, type=int)
 parser.add_argument('--resolution_in_mpp', help='resolution in mpp, usually 10x= 1mpp, 20x=0.5mpp, 40x=0.25, ', default=0, type=float)
 parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float)
-parser.add_argument('--BGR_to_RGB', help='set True if your input has BGR format', default=True, type=bool)
 parser.add_argument('--save_tile_preview', help='set True if you want nice pictures', default=True, type=bool)
 parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)
 
@@ -53,7 +52,6 @@ def main(args):
     - edge_threshold (int): Canny edge detection threshold. Patches with values smaller than this are discarded.
     - resolution_in_mpp (float): Resolution in microns per pixel (e.g., 10x=1mpp, 20x=0.5mpp, 40x=0.25).
     - downscaling_factor (float): Downscaling factor for the images; used if >0, overrides manual resolution.
-    - BGR_to_RGB (bool): Set to True if the input images have BGR format.
     - save_tile_preview (bool): Set to True if you want to save tile preview images.
     - preview_size (int): Size of tile_preview images.
 
@@ -103,14 +101,12 @@ def main(args):
     for slide_file in slide_files:
         slide = slideio.Slide(str(slide_file), driver)
         slide_name = slide_file.stem
-
-        # Extract features for each model
-        for model_dict in model_dicts:
-            extract_features(slide, slide_name, args, model_dict, args.scene_list, device)
+        extract_features(slide, slide_name, model_dicts,device,args)
 
 
 
-def extract_features(slide, slide_name,args, model_dict,scene_list,device): 
+
+def extract_features(slide, slide_name, model_dicts,device,args): 
     """
     Extract features from a slide using a given model.
 
@@ -127,17 +123,16 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device):
     """
     time0=time.time()
 
-    model=model_dict['model']
-    transform=model_dict['transforms']
-    model_name=model_dict['name']
-
-    feats=[]
+    feats = {model_dict["name"]: [] for model_dict in model_dicts}
     coords = pd.DataFrame({'scn' : [], 'x' : [], 'y' : []}) 
 
     if args.save_patch_images:
         (Path(args.save_path) / 'patches'/ slide_name).mkdir(parents=True, exist_ok=True)
+
+    
     #iterate over scenes of the slides
-    for scn in range(slide.num_scenes):# scene_list: #range(slide.num_scenes):
+    for scn in args.scene_list:# scene_list: #range(slide.num_scenes):
+            
         wsi_copy=None
         scene=slide.get_scene(scn)
         scaling=get_scaling(args,scene.resolution[0])
@@ -182,11 +177,15 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device):
 
                     #model inference on single patches
                     with torch.no_grad():
-                            
-                        img_t = transform(im)
-                        batch_t = img_t.unsqueeze(0).to(device)
-                        features = model(batch_t)
-                        feats.append(features)
+                        for model_dict in model_dicts:
+                            model=model_dict['model']
+                            transform=model_dict['transforms']
+                            model_name=model_dict['name']
+                            img_t = transform(im)
+                            batch_t = img_t.unsqueeze(0).to(device)
+                            features = model(batch_t)
+                            feats[model_name].append(features)
+
                         coords=pd.concat([coords, pd.DataFrame({'scn': [scn], 'x': [x], 'y': [y]})],ignore_index=True)
 
                     if args.save_tile_preview:
@@ -199,7 +198,7 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device):
             save_tile_preview(args, slide_name, scn, Image.fromarray(wsi_copy))
 
     # Write data to HDF5
-    save_hdf5(args, slide_name, model_name, coords, feats)
+    save_hdf5(args, slide_name, coords, feats)
 
     print(time.time()-time0, " seconds for extraction")                    
 
