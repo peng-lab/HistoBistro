@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import Parameter
 
-
 __all__ = ['ResNet',  'resnet50']
+
 
 def conv3x3(in_planes, out_planes, stride=1, groups=1, dilation=1):
     """3x3 convolution with padding"""
@@ -26,9 +26,11 @@ class BasicBlock(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
         if groups != 1 or base_width != 64:
-            raise ValueError('BasicBlock only supports groups=1 and base_width=64')
+            raise ValueError(
+                'BasicBlock only supports groups=1 and base_width=64')
         if dilation > 1:
-            raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
+            raise NotImplementedError(
+                "Dilation > 1 not supported in BasicBlock")
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(inplanes, planes, stride)
         self.bn1 = norm_layer(planes)
@@ -99,6 +101,7 @@ class Bottleneck(nn.Module):
 
         return out
 
+
 class NormedLinear(nn.Module):
 
     def __init__(self, in_features, out_features):
@@ -109,6 +112,7 @@ class NormedLinear(nn.Module):
     def forward(self, x):
         out = F.normalize(x, dim=1).mm(F.normalize(self.weight, dim=0))
         return out
+
 
 class ResNet(nn.Module):
 
@@ -152,7 +156,8 @@ class ResNet(nn.Module):
                                        dilate=replace_stride_with_dilation[2])
 
         if attention:
-            self.att_branch = self._make_layer(block, 512, attention_layers, 1, attention=True)
+            self.att_branch = self._make_layer(
+                block, 512, attention_layers, 1, attention=True)
         else:
             self.att_branch = None
 
@@ -163,7 +168,7 @@ class ResNet(nn.Module):
                 self.fc = nn.Sequential(
                     nn.Linear(512 * block.expansion, 512 * block.expansion),
                     nn.ReLU()
-                ) 
+                )
                 self.instDis = linear(512 * block.expansion, num_classes)
                 self.groupDis = linear(512 * block.expansion, num_classes)
             else:
@@ -171,16 +176,16 @@ class ResNet(nn.Module):
                     nn.Linear(512 * block.expansion, 512 * block.expansion),
                     nn.ReLU(),
                     linear(512 * block.expansion, num_classes)
-                ) 
+                )
         else:
             self.fc = nn.Linear(512 * block.expansion, num_classes)
             if self.two_branch:
                 self.groupDis = nn.Linear(512 * block.expansion, num_classes)
 
-
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(
+                    m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -205,7 +210,8 @@ class ResNet(nn.Module):
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
                 conv1x1(self.inplanes, planes * block.expansion, stride),
-                norm_layer(planes * block.expansion, momentum=self.momentum_bn),
+                norm_layer(planes * block.expansion,
+                           momentum=self.momentum_bn),
             )
 
         layers = []
@@ -262,6 +268,7 @@ def _resnet(block, layers, **kwargs):
     model = ResNet(block, layers, **kwargs)
     return model
 
+
 def resnet50(pretrained=False, progress=True, **kwargs):
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
@@ -270,5 +277,4 @@ def resnet50(pretrained=False, progress=True, **kwargs):
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    return _resnet( Bottleneck, [3, 4, 6, 3], **kwargs)
-
+    return _resnet(Bottleneck, [3, 4, 6, 3], **kwargs)

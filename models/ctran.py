@@ -1,6 +1,6 @@
-from timm.models.layers.helpers import to_2tuple
 import timm
 import torch.nn as nn
+from timm.models.layers.helpers import to_2tuple
 
 
 class ConvStem(nn.Module):
@@ -15,15 +15,16 @@ class ConvStem(nn.Module):
         patch_size = to_2tuple(patch_size)
         self.img_size = img_size
         self.patch_size = patch_size
-        self.grid_size = (img_size[0] // patch_size[0], img_size[1] // patch_size[1])
+        self.grid_size = (img_size[0] // patch_size[0],
+                          img_size[1] // patch_size[1])
         self.num_patches = self.grid_size[0] * self.grid_size[1]
         self.flatten = flatten
-
 
         stem = []
         input_dim, output_dim = 3, embed_dim // 8
         for l in range(2):
-            stem.append(nn.Conv2d(input_dim, output_dim, kernel_size=3, stride=2, padding=1, bias=False))
+            stem.append(nn.Conv2d(input_dim, output_dim,
+                        kernel_size=3, stride=2, padding=1, bias=False))
             stem.append(nn.BatchNorm2d(output_dim))
             stem.append(nn.ReLU(inplace=True))
             input_dim = output_dim
@@ -43,6 +44,8 @@ class ConvStem(nn.Module):
         x = self.norm(x)
         return x
 
+
 def ctranspath():
-    model = timm.create_model('swin_tiny_patch4_window7_224', embed_layer=ConvStem, pretrained=False)
+    model = timm.create_model(
+        'swin_tiny_patch4_window7_224', embed_layer=ConvStem, pretrained=False)
     return model
