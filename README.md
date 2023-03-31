@@ -26,6 +26,6 @@ python feature.py --slide_path /path/to/slides --save_path /path/to/save --file_
 
 
 Comments: 
-There is smaybe still some speedup possible. No benchmarking was done between different libraries used to load slides.
+There is maybe still some speedup possible. No benchmarking was done between different libraries used to load slides.
 The attempt in multithreading lead to CUDA errors. Not sure if there is something to gain there though.. Most time takes the loading of the slides and scenes, not sure if doing that in parallel is faster or if RAM/harddrive reading is the bottleneck. 
 
