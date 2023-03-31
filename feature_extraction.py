@@ -1,8 +1,8 @@
 import argparse
+import time
 from pathlib import Path
 
 import cv2
-import time
 import numpy as np
 import pandas as pd
 import slideio
@@ -11,7 +11,8 @@ from PIL import Image
 from tqdm import tqdm
 
 from models.model import get_models
-from utils.utils import bgr_format, get_driver, get_scaling, threshold, save_hdf5, save_tile_preview
+from utils.utils import (bgr_format, get_driver, get_scaling, save_hdf5,
+                         save_tile_preview, threshold)
 
 parser = argparse.ArgumentParser(description='Feature extraction')
 
@@ -20,9 +21,8 @@ parser.add_argument('--save_path', help='path to save everything', default='.', 
 parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
 parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['kimianet'], type=str)
 parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0,1], type=int)
-parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=False, type=bool)
+parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=True, type=bool)
 parser.add_argument('--patch_size', help='Patch size for saving', default=256, type=int)
-parser.add_argument('--border_map', help='Set true or false for creating thumbnails with highlighted extracted patched', default=True, type=bool)
 parser.add_argument('--white_thresh', help='if all RGB pixel values are larger than this value, the pixel is considered as white/background', default=170, type=int)
 parser.add_argument('--black_thresh', help='if all RGB pixel values are smaller or equal than this value, the pixel is considered as black/background', default=0, type=str)
 parser.add_argument('--invalid_ratio_thresh', help='True if each patch should be saved as an image', default=0.5, type=float)
@@ -34,9 +34,7 @@ parser.add_argument('--save_tile_preview', help='set True if you want nice pictu
 parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)
 
 
-import torch
-from pathlib import Path
-import slideio
+
 
 def main(args):
     """
@@ -49,7 +47,6 @@ def main(args):
     - scene_list (list): List of scenes to process.
     - save_patch_images (bool): Whether to save each patch as an image.
     - patch_size (int): Size of the image patches to process.
-    - border_map (bool): Whether to create thumbnails with highlighted extracted patches.
     - white_thresh (int): Threshold for considering a pixel as white/background (based on RGB values).
     - black_thresh (int): Threshold for considering a pixel as black/background (based on RGB values).
     - invalid_ratio_thresh (float): Threshold for invalid ratio in patch images.
@@ -100,8 +97,7 @@ def main(args):
     # Create directories
     if args.save_tile_preview:
         (Path(args.save_path) / 'tiling_previews').mkdir(parents=True, exist_ok=True)
-    if args.save_patch_images:
-        Path(args.save_path / 'patches').mkdir(parents=True, exist_ok=True)
+    
 
     # Process slide files
     for slide_file in slide_files:
@@ -138,8 +134,10 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device):
     feats=[]
     coords = pd.DataFrame({'scn' : [], 'x' : [], 'y' : []}) 
 
+    if args.save_patch_images:
+        (Path(args.save_path) / 'patches'/ slide_name).mkdir(parents=True, exist_ok=True)
     #iterate over scenes of the slides
-    for scn in scene_list: #range(slide.num_scenes):
+    for scn in range(slide.num_scenes):# scene_list: #range(slide.num_scenes):
         wsi_copy=None
         scene=slide.get_scene(scn)
         scaling=get_scaling(args,scene.resolution[0])
@@ -180,7 +178,7 @@ def extract_features(slide, slide_name,args, model_dict,scene_list,device):
                     im=Image.fromarray(patch)
 
                     if args.save_patch_images:
-                        im.save(Path(args.save_path / 'patches' / f'{slide_name}_patch_{scn}_{x}_{y}.png'))
+                        im.save(Path(args.save_path) / 'patches' / slide_name/ f'{slide_name}_patch_{scn}_{x}_{y}.png')
 
                     #model inference on single patches
                     with torch.no_grad():
