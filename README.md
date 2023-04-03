@@ -2,14 +2,25 @@
 
 Preparation: 
 
-    For CTransPath: 
-    download weights: https://drive.google.com/file/d/1DoDx_70_TLj98gTf6YTXnu4tFhsFocDX/view
+    CTransPath: 
+        224x224 pixels
+        weights: https://drive.google.com/file/d/1DoDx_70_TLj98gTf6YTXnu4tFhsFocDX/view
+        paper: https://www.sciencedirect.com/science/article/abs/pii/S1361841522002043 
+        repo: https://github.com/Xiyue-Wang/TransPath
 
     RetCCL:
-    download weights: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL
+        256x256 pixels @ multiple scales
+        weights: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL
+        paper: https://www.sciencedirect.com/science/article/abs/pii/S1361841522002730 
+        repo: https://github.com/Xiyue-Wang/RetCCL
+
 
     Kimianet: 
-    download weights: https://kimialab.uwaterloo.ca/kimia/index.php/sdm_downloads/kimianet-weights/ 
+        1000x1000 pixels @ 20x magnification
+        weights: https://kimialab.uwaterloo.ca/kimia/index.php/sdm_downloads/kimianet-weights/ 
+        paper: https://arxiv.org/abs/2101.07903
+        Code Samples: https://kimialab.uwaterloo.ca/kimia/index.php/sdm_downloads/kimianet-feature-extraction-code-samples/ 
+
 
 create your conda environment: 
 conda create --name feature_ex python=3.9

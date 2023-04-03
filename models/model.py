@@ -6,12 +6,14 @@ from torchvision.models import resnet
 from models.ctran import ctranspath
 from models.kimianet import load_kimianet
 from models.resnet_retccl import resnet50 as retccl_res50
+from models.simsalabim import ResNetSimCLR
 
 # RetCCL can be downloaded here: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL?usp=sharing
 # kimianet download: https://kimialab.uwaterloo.ca/kimia/?smd_process_download=1&download_id=4216
 RETCCL_PATH = '/mnt/volume/models/retccl.pth'
 CTRANSPATH_PATH = '/mnt/volume/models/ctranspath.pth'
 KIMIANET_PATH = '/mnt/volume/models/KimiaNetPyTorchWeights.pth'
+SIMCLR_LUNG_PATH= '/mnt/volume/models/rushinssimclr.pth' 
 
 
 def get_models(modelnames):
@@ -27,6 +29,8 @@ def get_models(modelnames):
             model = get_res50()
         elif modelname.lower() == "kimianet":
             model = get_kimianet()
+        elif modelname.lower() == "simclr_lung":
+            model = get_simclr_lung()
         model.to(device)
         model = torch.compile(model)
         model.eval()
@@ -56,6 +60,11 @@ def get_ctranspath():
 def get_kimianet():
     return load_kimianet(KIMIANET_PATH)
 
+def get_simclr_lung():
+    model=ResNetSimCLR()
+    pretrained = torch.load(SIMCLR_LUNG_PATH)
+    model.load_state_dict(pretrained,strict=False)
+    return model
 
 def get_res50():
 
@@ -76,12 +85,13 @@ def get_transforms(model_name):
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
 
-    if model_name.lower() in ['ctranspath', 'resnet50']:
+    if model_name.lower() in ['ctranspath', 'resnet50',"simclr_lung"]:
         resolution = 224
     elif model_name.lower() == 'retccl':
         resolution = 256
     elif model_name.lower() == 'kimianet':
         resolution = 1000
+
     else:
         raise ValueError('Model name not found')
 
