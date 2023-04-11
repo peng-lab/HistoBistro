@@ -109,10 +109,6 @@ class ClassifierLightning(pl.LightningModule):
 
         return loss
 
-    def on_validation_epoch_start(self) -> None:
-        self.y_val = []
-        self.preds_val = []
-
     def validation_step(self, batch, batch_idx):
         x, _, y, _, _ = batch  # x = features, y = labels
         logits = self.forward(x)
@@ -141,7 +137,7 @@ class ClassifierLightning(pl.LightningModule):
         self.outputs = pd.DataFrame(columns=column_names)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
-        x, _, y, _, patient = batch  # x=features, y=labels
+        x, _, y, _, patient = batch  # x = features, y = labels
         logits = self.forward(x)
         loss = self.criterion(logits, y)
         probs = torch.sigmoid(logits)
@@ -164,7 +160,7 @@ class ClassifierLightning(pl.LightningModule):
 
         # TODO rewrite for batch size > 1 (not needed atm bc bs=1 always in testing mode)
         results = pd.DataFrame(
-            data=[[patient[0], y.item(), preds.item(), logits.item(), (y==preds).item()]], 
+            data=[[patient[0], y.item(), preds.item(), logits.item(), (y==preds).int().item()]], 
             columns=['patient', 'ground_truth', 'predictions', 'logits', 'correct']
         )
         self.outputs = pd.concat([self.outputs, results], ignore_index=True)
