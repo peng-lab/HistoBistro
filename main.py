@@ -11,6 +11,7 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger, CSVLogger
 from torch.utils.data import DataLoader
 import wandb
+from idkidc.utils import save_results
 
 from options import Options
 from data_utils import MILDataset, MILDatasetIndices, get_multi_cohort_df
@@ -187,39 +188,10 @@ def main(cfg):
             # save patient predictions to outputs csv file
             model.outputs.to_csv(result_path / f'fold{l}' / f'outputs_{test_cohorts[idx]}.csv')
             
-    # TODO create results csv file averaged over all folds    
-    # save results to dataframe 
-    labels_per_fold = list(results[test_cohorts[0]][0].keys())
-    labels_mean_std = [f'{l} {v}' for l in labels_per_fold for v in ['mean', 'std']]
-    labels = [f'{l}_fold{k}' for l in labels_per_fold for k in range(len(results[test_cohorts[0]]))]
-    labels = labels_mean_std + labels
-    data = [[] for k in test_cohorts]
-    
-    for idx_c, c in enumerate(test_cohorts):  # --- came until here 
-        # calculate mean and std over folds
-        folds = []
-        for l in labels_per_fold:
-            fold = [results[c][k][l] for k in range(cfg.folds)]
-            folds.extend(fold)
-            fold = np.array(fold)
-            data[idx_c].extend((fold.mean(), fold.std()))
-        data[idx_c].extend(folds)
-    results_df = pd.DataFrame(data, columns=labels)
-    num_cols = len(results_df.columns)
-
-    # add other information about the training
-    results_df['Train'] = train_cohorts
-    results_df['Test'] = test_cohorts
-    results_df['Target'] = cfg.target
-    results_df['Normalization'] = cfg.norm
-    results_df['Feature Extraction'] = cfg.feats
-    results_df['Algorithm'] = cfg.model
-    results_df['Comments'] = f'{cfg.logging_name}, random state for splitting {cfg.seed}'
-    # reorder columns and save to csv
-    cols = results_df.columns.to_list()[num_cols:] + results_df.columns.to_list()[:num_cols]        
-    results_df = results_df[cols]
-    results_df.to_csv(result_path / f'results_{cfg.logging_name}.csv', sep=',', index=False)
-
+        wandb.finish()  # required for new wandb run in next fold
+            
+    # save results to csv file
+    save_results(cfg, results, base_path, train_cohorts, test_cohorts)
 
 if __name__ == '__main__':
     parser = Options()
