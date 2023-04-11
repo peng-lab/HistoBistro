@@ -146,7 +146,6 @@ class HistAuGAN(pl.LightningModule):
             dis2_opt.step()
 
             # update enc_c, enc_a, gen
-            # todo: refactor names for better meaning
             enc_c_opt.zero_grad()
             enc_a_opt.zero_grad()
             gen_opt.zero_grad()

@@ -11,11 +11,11 @@ from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import WandbLogger, CSVLogger
 from torch.utils.data import DataLoader
 import wandb
-from idkidc.utils import save_results
 
 from options import Options
 from data_utils import MILDataset, MILDatasetIndices, get_multi_cohort_df
 from classifier import ClassifierLightning
+from utils import save_results
 
 
 def main(cfg):
