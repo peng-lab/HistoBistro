@@ -205,12 +205,12 @@ MSI_cohorts_munich = {
     # },
     'TCGA': {
         'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/TCGA-CRC-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/TCGA-CRC-DX_SLIDE.csv'),
+        'clini_table': Path('/home/ubuntu/data/TCGA-CRC/TCGA-CRC-DX_CLINI.xlsx'),
+        'slide_csv': Path('/home/ubuntu/data/TCGA-CRC/TCGA-CRC-DX_SLIDE.csv'),
         'feature_dir': {
             'macenko': {
                 'retccl': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Macenko/CTransPath/')
+                'ctranspath': Path('/home/ubuntu/data/TCGA-CRC/features/TCGA_Macenko_CTransPath')
             },
             'raw': {
                 'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/marugoto_histaugan'),
@@ -227,12 +227,13 @@ MSI_cohorts_munich = {
         'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
         # 'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_clinical_data.xlsx'),
         # 'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_slide.csv'),
-        'clini_table': Path('/content/drive/MyDrive/PhD/data/clini_tables/coad_cptac_2019_clinical_data.xlsx'),
-        'slide_csv': Path('/content/drive/MyDrive/PhD/data/clini_tables/coad_cptac_2019_slide.csv'),
+        'clini_table': Path('/home/ubuntu/data/CPTAC-COAD/coad_cptac_2019_clinical_data.xlsx'),
+        'slide_csv': Path('/home/ubuntu/data/CPTAC-COAD/coad_cptac_2019_slide.csv'),
         'feature_dir': {
             'macenko': {
                 'retccl': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Macenko/RetCCL'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Macenko/CTransPath/')
+                # 'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Macenko/CTransPath/')
+                'ctranspath': Path('/home/ubuntu/data/CPTAC-COAD/features/CPTAC_Macenko_CTransPath')
             },
             'raw': {
                 'retccl': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Raw/RetCCL'), 

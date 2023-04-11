@@ -1,7 +1,7 @@
 # logging options
 save_dir:
   desc: path to save models, outputs, and folds
-  value: /content/logs
+  value: /home/ubuntu/logs
 project:
   desc: wandb project name
   value: hackathon
@@ -21,7 +21,7 @@ num_classes:
   value: 1
 cohorts:
   desc: cohort used for training
-  value: ["CPTAC"]
+  value: ["TCGA"]
 ext_cohorts:
   desc: cohort used for external validation
   value: ["CPTAC"]
@@ -38,7 +38,7 @@ model:
   value: transformer
 norm:
   desc: type of pre-processing
-  value: raw
+  value: macenko
 feats:
   desc: type of features
   value: ctranspath
@@ -47,7 +47,7 @@ input_dim:
   value: 768
 num_tiles:
   desc: number of tiles to sample from all tiles
-  value: -1
+  value: 128
 pad_tiles:
   desc: whether to pad the tiles up to num_tiles if #tiles is smaller than num_tiles
   value: false
@@ -73,7 +73,7 @@ wd:
   value: 2.0e-05
 bs:
   desc: batch size during training
-  value: 1
+  value: 32
 stop_criterion:
   desc: metric for choosing best model
   value: loss
