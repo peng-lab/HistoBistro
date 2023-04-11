@@ -151,16 +151,16 @@ class ClassifierLightning(pl.LightningModule):
         self.specificity_test(probs, y)
 
         self.log("loss/test", loss, prog_bar=False)
-        self.log("acc/val", self.acc_test, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("auroc/val", self.auroc_test, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("f1/val", self.f1_test, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("precision/val", self.precision_test, prog_bar=False, on_step=False, on_epoch=True)
-        self.log("recall/val", self.recall_test, prog_bar=False, on_step=False, on_epoch=True)
-        self.log("specificity/val", self.specificity_test, prog_bar=False, on_step=False, on_epoch=True)
+        self.log("acc/test", self.acc_test, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("auroc/test", self.auroc_test, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("f1/test", self.f1_test, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("precision/test", self.precision_test, prog_bar=False, on_step=False, on_epoch=True)
+        self.log("recall/test", self.recall_test, prog_bar=False, on_step=False, on_epoch=True)
+        self.log("specificity/test", self.specificity_test, prog_bar=False, on_step=False, on_epoch=True)
 
         # TODO rewrite for batch size > 1 (not needed atm bc bs=1 always in testing mode)
-        results = pd.DataFrame(
+        outputs = pd.DataFrame(
             data=[[patient[0], y.item(), preds.item(), logits.item(), (y==preds).int().item()]], 
             columns=['patient', 'ground_truth', 'predictions', 'logits', 'correct']
         )
-        self.outputs = pd.concat([self.outputs, results], ignore_index=True)
+        self.outputs = pd.concat([self.outputs, outputs], ignore_index=True)

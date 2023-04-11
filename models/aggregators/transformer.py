@@ -14,17 +14,9 @@ class TransformerBlocks(nn.Module):
                 nn.ModuleList(
                     [
                         PreNorm(
-                            dim,
-                            Attention(
-                                dim,
-                                heads=heads,
-                                dim_head=dim_head,
-                                dropout=dropout
-                            )
+                            dim, Attention(dim, heads=heads, dim_head=dim_head, dropout=dropout)
                         ),
-                        PreNorm(
-                            dim, FeedForward(dim, mlp_dim, dropout=dropout)
-                        )
+                        PreNorm(dim, FeedForward(dim, mlp_dim, dropout=dropout))
                     ]
                 )
             )
@@ -56,41 +48,36 @@ class Transformer(BaseAggregator):
             'cls', 'mean'
         }, 'pool type must be either cls (class token) or mean (mean pooling)'
 
-        self.projection = nn.Sequential(
-            nn.Linear(input_dim, 512, bias=True), nn.ReLU()
-        ) 
-        self.mlp_head = nn.Sequential(
-            nn.LayerNorm(dim), nn.Linear(dim, num_classes)
-        )
-        self.transformer = TransformerBlocks(
-            dim, depth, heads, dim_head, mlp_dim, dropout
-        )
-        
+        self.projection = nn.Sequential(nn.Linear(input_dim, 512, bias=True), nn.ReLU())
+        self.mlp_head = nn.Sequential(nn.LayerNorm(dim), nn.Linear(dim, num_classes))
+        self.transformer = TransformerBlocks(dim, depth, heads, dim_head, mlp_dim, dropout)
+
         self.pool = pool
         self.cls_token = nn.Parameter(torch.randn(1, 1, dim))
-        
+
         self.norm = nn.LayerNorm(dim)
         self.dropout = nn.Dropout(emb_dropout)
         self.pos_emb = SinusoidalPositionalEmbedding(dim)
-        
-    
+
     def forward(self, x, use_pos=False, register_hook=False):
         b, _, _ = x.shape
-        cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
 
         x = self.projection(x)
-        
+
         if self.pool == 'cls':
+            cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
             x = torch.cat((cls_tokens, x), dim=1)
-        
+
         if use_pos:
             x += self.pos_emb(x)
 
         x = self.dropout(x)
         x = self.transformer(x, register_hook=register_hook)
         x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0]
-    
-        return self.mlp_head(self.norm(x))
+
+        # return self.mlp_head(self.norm(x))
+        return self.mlp_head(x)
+
 
 transformer = Transformer(num_classes=2)
 transformer(torch.rand(1, 1, 2048))
