@@ -1,3 +1,4 @@
+from pathlib import Path
 import pandas as pd
 import torch
 import torchmetrics
@@ -63,7 +64,6 @@ class ClassifierLightning(pl.LightningModule):
             task=config.task,
             num_classes=config.num_classes,
         )
-        
         self.recall_test = torchmetrics.Recall(
             task=config.task,
             num_classes=config.num_classes,
@@ -89,14 +89,15 @@ class ClassifierLightning(pl.LightningModule):
             lr=self.lr,
             wd=self.wd
         )
+        # TODO add lr scheduler
         # scheduler = self.scheduler(
         #     name=self.config.scheduler,
         #     optimizer=optimizer, 
         # )
         return [optimizer] # , [scheduler]
 
-    def training_step(self, batch, indice):
-        x, coords, y, tiles, _ = batch  # x=features, y=labels
+    def training_step(self, batch, batch_idx):
+        x, _, y, _, _ = batch  # x = features, y = labels
         logits = self.forward(x)
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1, keepdim=True)
@@ -108,93 +109,62 @@ class ClassifierLightning(pl.LightningModule):
 
         return loss
 
-    def validation_step(self, batch, indice):
-        x, coords, y, tiles, patient = batch  # x=features, y=labels
+    def on_validation_epoch_start(self) -> None:
+        self.y_val = []
+        self.preds_val = []
+
+    def validation_step(self, batch, batch_idx):
+        x, _, y, _, _ = batch  # x = features, y = labels
         logits = self.forward(x)
-        loss = F.cross_entropy(logits, y)
-        preds = torch.argmax(logits, dim=1, keepdim=True)
-
+        loss = self.criterion(logits, y)
+        probs = torch.sigmoid(logits)
+        preds = torch.argmax(probs, dim=1, keepdim=True)
+        
         self.acc_val(preds, y)
-        self.auroc_val(preds, y)
-        self.f1_val(preds, y)
-        self.precision_val(preds, y)
-        self.recall_val(preds, y)
-        self.specificity_val(preds, y)
+        self.auroc_val(probs, y)
+        self.f1_val(probs, y)
+        self.precision_val(probs, y)
+        self.recall_val(probs, y)
+        self.specificity_val(probs, y)
 
-        self.log("acc/val", self.acc_val, prog_bar=True)
-        self.log("auroc/val", self.auroc_val, prog_bar=False)
-        self.log("f1/val", self.f1_val, prog_bar=True)
-        self.log("loss/val", loss, prog_bar=False)
-        self.log("precision/val", self.precision_val, prog_bar=False)
-        self.log("recall/val", self.recall_val, prog_bar=False)
-        self.log("specificity/val", self.specificity_val, prog_bar=False)
-        
-        outputs = {
-            'patient': patient,
-            'ground_truth': y,
-            'predictions': preds,
-            'logits': logits,
-            'correct': y == preds,
-        }
-        
-        return outputs
-        
-    def on_val_epoch_end(self, outputs):
-        results = {
-            'patient': torch.stack([x['patient'] for x in outputs]).cpu().numpy(),
-            'ground_truth': torch.stack([x['ground_truth'] for x in outputs]).cpu().numpy(),
-            'predictions': torch.stack([x['predictions'] for x in outputs]).cpu().numpy(),
-            'logits': torch.stack([x['logits'] for x in outputs]).cpu().numpy(),
-            'correct': torch.stack([x['correct'] for x in outputs]).cpu().numpy(),
-        }
-
-        return pd.DataFrame(results)
+        self.log("loss/val", loss, prog_bar=True)
+        self.log("acc/val", self.acc_val, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("auroc/val", self.auroc_val, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("f1/val", self.f1_val, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("precision/val", self.precision_val, prog_bar=False, on_step=False, on_epoch=True)
+        self.log("recall/val", self.recall_val, prog_bar=False, on_step=False, on_epoch=True)
+        self.log("specificity/val", self.specificity_val, prog_bar=False, on_step=False, on_epoch=True)
+    
+    def on_test_epoch_start(self) -> None:
+        # save test outputs in dataframe per test dataset
+        column_names = ['patient', 'ground_truth', 'predictions', 'logits', 'correct']
+        self.outputs = pd.DataFrame(columns=column_names)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
-        print('hi')
-        print(dataloader_idx)
-        x, coords, y, tiles, patient = batch  # x=features, y=labels
+        x, _, y, _, patient = batch  # x=features, y=labels
         logits = self.forward(x)
-        loss = F.cross_entropy(logits, y)
-        preds = torch.argmax(logits, dim=1, keepdim=True)
+        loss = self.criterion(logits, y)
+        probs = torch.sigmoid(logits)
+        preds = torch.argmax(probs, dim=1, keepdim=True)
         
         self.acc_test(preds, y)
-        self.auroc_test(preds, y)
-        self.f1_test(preds, y)
-        self.precision_test(preds, y)
-        self.recall_test(preds, y)
-        self.specificity_test(preds, y)
-        
-        self.log(f'acc/test_{dataloader_idx}', self.acc_test, prog_bar=True)
-        self.log(f'auroc/test_{dataloader_idx}', self.auroc_test, prog_bar=False)
-        self.log(f'f1/test_{dataloader_idx}', self.f1_test, prog_bar=True)
-        self.log(f'loss/test_{dataloader_idx}', loss, prog_bar=False)
-        self.log(f'precision/test_{dataloader_idx}', self.precision_test, prog_bar=False)
-        self.log(f'recall/test_{dataloader_idx}', self.recall_test, prog_bar=False)
-        self.log(f'specificity/test_{dataloader_idx}', self.specificity_test, prog_bar=False)
-        
-        outputs = {
-            dataloader_idx: {
-                'patient': patient,
-                'ground_truth': y,
-                'predictions': preds,
-                'logits': logits,
-                'correct': y == preds,
-            }
-        }
-        
-        return outputs
-        
-    def on_test_end(self, x, dataloader_idx=0):
-        print(x)
-        results = {
-            'patient': torch.stack([x[dataloader_idx]['patient'] for x in outputs]).cpu().numpy(),
-            'ground_truth': torch.stack([x[dataloader_idx]['ground_truth'] for x in outputs]).cpu().numpy(),
-            'predictions': torch.stack([x[dataloader_idx]['predictions'] for x in outputs]).cpu().numpy(),
-            'logits': torch.stack([x[dataloader_idx]['logits'] for x in outputs]).cpu().numpy(),
-            'correct': torch.stack([x[dataloader_idx]['correct'] for x in outputs]).cpu().numpy(),
-        }
+        self.auroc_test(probs, y)
+        self.f1_test(probs, y)
+        self.precision_test(probs, y)
+        self.recall_test(probs, y)
+        self.specificity_test(probs, y)
 
-        return pd.DataFrame(results)
-        
+        self.log("loss/test", loss, prog_bar=False)
+        self.log("acc/val", self.acc_test, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("auroc/val", self.auroc_test, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("f1/val", self.f1_test, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("precision/val", self.precision_test, prog_bar=False, on_step=False, on_epoch=True)
+        self.log("recall/val", self.recall_test, prog_bar=False, on_step=False, on_epoch=True)
+        self.log("specificity/val", self.specificity_test, prog_bar=False, on_step=False, on_epoch=True)
 
+        # TODO rewrite for batch size > 1 (not needed atm bc bs=1 always in testing mode)
+        results = pd.DataFrame(
+            data=[[patient[0], y.item(), preds.item(), logits.item(), (y==preds).item()]], 
+            columns=['patient', 'ground_truth', 'predictions', 'logits', 'correct']
+        )
+        self.outputs = pd.concat([self.outputs, results], ignore_index=True)
