@@ -13,7 +13,7 @@ Training script for multiple instance learning with various aggregation models. 
 │   │   ├── model_utils.py          # common layers and functions used in the other models
 │   │   ├── perceiver.py
 │   │   ├── test_aggregators.py     # test new aggregators
-│   │   ├── transformer.py          # test new aggregators
+│   │   ├── transformer.py
 │   │   ├── transmil.py             # model by Shao et al. 2021
 │   ├── histaugan                   # model from Sophia for augmentation
 │   │   ├── __init__.py  
