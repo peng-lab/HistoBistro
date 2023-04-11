@@ -1,6 +1,7 @@
 from pathlib import Path
 import numpy as np
 import argparse
+import pandas as pd
 import yaml
 
 import pytorch_lightning as pl
@@ -22,8 +23,8 @@ def main(cfg):
 
     # saving locations
     base_path = Path(cfg.save_dir)  # adapt to own target path
-    logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if not cfg.debug else 'debug'
-    base_path = base_path / logging_name
+    cfg.logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if not cfg.debug else 'debug'
+    base_path = base_path / cfg.logging_name
     base_path.mkdir(parents=True, exist_ok=True)
     model_path = base_path / 'models'
     fold_path = base_path / 'folds'
@@ -52,7 +53,11 @@ def main(cfg):
             feats=cfg.feats,
             clini_info=cfg.clini_info
         )
-        test_ext_dataloader.append(DataLoader(dataset=dataset_ext, batch_size=1, shuffle=False, pin_memory=True))
+        test_ext_dataloader.append(DataLoader(dataset=dataset_ext, batch_size=1, shuffle=False, num_workers=14, pin_memory=True))
+        
+    train_cohorts = f'{", ".join(cfg.cohorts)}'
+    test_cohorts = [train_cohorts, *cfg.ext_cohorts]
+    results = {t: [] for t in test_cohorts}
 
     # --------------------------------------------------------
     # k-fold cross validation
@@ -62,7 +67,7 @@ def main(cfg):
     target_stratisfy = cfg.target if type(cfg.target) is str else cfg.target[0]
     splits = skf.split(patient_df, patient_df[target_stratisfy])
 
-    for k, (train_val_idxs, test_idxs) in enumerate(splits):
+    for l, (train_val_idxs, test_idxs) in enumerate(splits):
         train_idxs, val_idxs = train_test_split( train_val_idxs, stratify=patient_df.iloc[train_val_idxs][target_stratisfy], random_state=cfg.seed)
         
         # training dataset
@@ -73,31 +78,31 @@ def main(cfg):
             pad_tiles=cfg.pad_tiles,
             norm=cfg.norm
         )
-        np.savetxt(fold_path / f'folds_{logging_name}_fold{k}_train.csv', train_idxs, delimiter=',')
-        print(f'num training samples in fold {k}: {len(train_dataset)}')
+        patient_df['PATIENT'][train_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_train.csv')
+        print(f'num training samples in fold {l}: {len(train_dataset)}')
         train_dataloader = DataLoader(
-            dataset=train_dataset, batch_size=cfg.bs, shuffle=True, pin_memory=True
+            dataset=train_dataset, batch_size=cfg.bs, shuffle=True, num_workers=14, pin_memory=True
         )
         
         # validation dataset
         val_dataset = MILDatasetIndices(data, val_idxs, [cfg.target], norm=norm_val)
-        np.savetxt(fold_path / f'folds_{logging_name}_fold{k}_val.csv', val_idxs, delimiter=',')
-        print(f'num validation samples in fold {k}: {len(val_dataset)}')
+        patient_df['PATIENT'][val_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_val.csv')
+        print(f'num validation samples in fold {l}: {len(val_dataset)}')
         val_dataloader = DataLoader(
-            dataset=val_dataset, batch_size=cfg.bs, shuffle=False, pin_memory=True
+            dataset=val_dataset, batch_size=1, shuffle=False, num_workers=14, pin_memory=True
         )
 
         # test dataset (in-domain)
         test_dataset = MILDatasetIndices(data, test_idxs, [cfg.target], norm=norm_test)
-        np.savetxt(fold_path / f'folds_{logging_name}_fold{k}_test.csv', test_idxs, delimiter=',')
-        print(f'num test samples in fold {k}: {len(test_dataset)}')
+        patient_df['PATIENT'][test_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_test.csv')
+        print(f'num test samples in fold {l}: {len(test_dataset)}')
         test_dataloader = DataLoader(
-            dataset=test_dataset, batch_size=cfg.bs, shuffle=False, pin_memory=True
+            dataset=test_dataset, batch_size=1, shuffle=False, num_workers=14, pin_memory=True
         )
 
         # idx=2 since the ouput is feats, coords, labels
         num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
-        cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos).item()
+        cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
         cfg.criterion = "BCEWithLogitsLoss"
 
         # --------------------------------------------------------
@@ -110,7 +115,7 @@ def main(cfg):
         # --------------------------------------------------------
         logger = WandbLogger(
             project=cfg.project,
-            name=f'{logging_name}_fold{k}',
+            name=f'{cfg.logging_name}_fold{l}',
             save_dir=cfg.save_dir,
             reinit=True,
             settings=wandb.Settings(start_method='fork'),
@@ -118,7 +123,7 @@ def main(cfg):
 
         csv_logger = CSVLogger(
             save_dir=result_path,
-            name=f'fold{k}',
+            name=f'fold{l}',
         )
 
         # --------------------------------------------------------
@@ -127,11 +132,15 @@ def main(cfg):
         checkpoint_callback = ModelCheckpoint(
             monitor='auroc/val' if cfg.stop_criterion == 'auroc' else 'loss/val',
             dirpath=model_path,
-            filename=f'best_model_{logging_name}_fold{k}',
+            filename=f'best_model_{cfg.logging_name}_fold{l}',
             save_top_k=1,
             mode='max' if cfg.stop_criterion == 'auroc' else 'min',
         )
 
+        # --------------------------------------------------------
+        # training
+        # --------------------------------------------------------
+        
         trainer = pl.Trainer(
             logger=[logger, csv_logger],
             accelerator='auto',
@@ -139,15 +148,15 @@ def main(cfg):
             accumulate_grad_batches=4,
             gradient_clip_val=1,
             callbacks=[checkpoint_callback],
+            max_epochs=cfg.num_epochs,
             # track_grad_norm=2,      # debug
             # num_sanity_val_steps=0,  # debug
             # val_check_interval=0.1,  # debug
             # limit_val_batches=0.1,  # debug
             # limit_train_batches=6,  # debug
             # limit_val_batches=6,    # debug
-            # log_every_n_steps=1,  # debug
+            log_every_n_steps=1,  # debug
             # fast_dev_run=True,    # debug
-            # max_epochs=1,         # debug
             # max_steps=6,          # debug
             # enable_model_summary=False,  # debug
         )
@@ -159,14 +168,57 @@ def main(cfg):
             ckpt_path=cfg.resume,
         )
         logger.log_table('results/val', results_val)
+        
+        # --------------------------------------------------------
+        # testing
+        # --------------------------------------------------------
 
-        results_test = trainer.test(
-            model.load_from_checkpoint(checkpoint_callback.best_model_path),
-            [test_dataloader, *test_ext_dataloader],
-        )
-        test_cohorts = [cfg.cohorts, *cfg.ext_cohort]
-        for i, result in enumerate(results_test):
-            logger.log_table(f'results/test_{i}', result)
+        # TODO write test function in separate file (read test split from csv files created above, load correct models for folds)
+        # TODO rewrite for multiple dataloader (problem: how to save results to csv with correct name?)
+        test_cohorts_dataloader = [test_dataloader, *test_ext_dataloader]
+        for idx in range(len(test_cohorts)):
+            results_test = trainer.test(
+                model,
+                test_cohorts_dataloader[idx],
+                ckpt_path='best',
+            )
+            results[test_cohorts[idx]].append(results_test[0])
+            print(results_test[0])
+            # save patient predictions to outputs csv file
+            model.outputs.to_csv(result_path / f'fold{l}' / f'outputs_{test_cohorts[idx]}.csv')
+            
+    # TODO create results csv file averaged over all folds    
+    # save results to dataframe 
+    labels_per_fold = list(results[test_cohorts[0]][0].keys())
+    labels_mean_std = [f'{l} {v}' for l in labels_per_fold for v in ['mean', 'std']]
+    labels = [f'{l}_fold{k}' for l in labels_per_fold for k in range(len(results[test_cohorts[0]]))]
+    labels = labels_mean_std + labels
+    data = [[] for k in test_cohorts]
+    
+    for idx_c, c in enumerate(test_cohorts):  # --- came until here 
+        # calculate mean and std over folds
+        folds = []
+        for l in labels_per_fold:
+            fold = [results[c][k][l] for k in range(cfg.folds)]
+            folds.extend(fold)
+            fold = np.array(fold)
+            data[idx_c].extend((fold.mean(), fold.std()))
+        data[idx_c].extend(folds)
+    results_df = pd.DataFrame(data, columns=labels)
+    num_cols = len(results_df.columns)
+
+    # add other information about the training
+    results_df['Train'] = train_cohorts
+    results_df['Test'] = test_cohorts
+    results_df['Target'] = cfg.target
+    results_df['Normalization'] = cfg.norm
+    results_df['Feature Extraction'] = cfg.feats
+    results_df['Algorithm'] = cfg.model
+    results_df['Comments'] = f'{cfg.logging_name}, random state for splitting {cfg.seed}'
+    # reorder columns and save to csv
+    cols = results_df.columns.to_list()[num_cols:] + results_df.columns.to_list()[:num_cols]        
+    results_df = results_df[cols]
+    results_df.to_csv(result_path / f'results_{cfg.logging_name}.csv', sep=',', index=False)
 
 
 if __name__ == '__main__':
