@@ -145,7 +145,7 @@ def main(cfg):
         trainer = pl.Trainer(
             logger=[logger, csv_logger],
             accelerator='auto',
-            precision=16,
+            precision='16-mixed',
             accumulate_grad_batches=4,
             gradient_clip_val=1,
             callbacks=[checkpoint_callback],
