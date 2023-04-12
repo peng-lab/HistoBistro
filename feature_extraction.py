@@ -16,10 +16,10 @@ from utils.utils import (bgr_format, get_driver, get_scaling, save_hdf5,
 
 parser = argparse.ArgumentParser(description='Feature extraction')
 
-parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/volume/raw_data/AIT', type=str)
+parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/volume/raw_data/2019', type=str)
 parser.add_argument('--save_path', help='path to save everything', default='.', type=str)
 parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
-parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['simclr_lung','resnet50'], type=str)
+parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['sam_vit_l','sam_vit_b'], type=str)
 parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0,1], type=int)
 parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=False, type=bool)
 parser.add_argument('--patch_size', help='Patch size for saving', default=256, type=int)
@@ -131,7 +131,7 @@ def extract_features(slide, slide_name, model_dicts,device,args):
 
     
     #iterate over scenes of the slides
-    for scn in args.scene_list:# scene_list: #range(slide.num_scenes):
+    for scn in range(slide.num_scenes):
             
         wsi_copy=None
         scene=slide.get_scene(scn)
