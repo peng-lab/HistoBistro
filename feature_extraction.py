@@ -9,6 +9,7 @@ import slideio
 import torch
 from PIL import Image
 from tqdm import tqdm
+import re
 
 from models.model import get_models
 from utils.utils import (bgr_format, get_driver, get_scaling, save_hdf5,
@@ -17,15 +18,15 @@ from utils.utils import (bgr_format, get_driver, get_scaling, save_hdf5,
 parser = argparse.ArgumentParser(description='Feature extraction')
 
 parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/volume/raw_data/2019', type=str)
-parser.add_argument('--save_path', help='path to save everything', default='.', type=str)
+parser.add_argument('--save_path', help='path to save everything', default='/mnt/volume/features/2019', type=str)
 parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
-parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['sam_vit_l','sam_vit_b'], type=str)
+parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['resnet50','retccl','ctranspath'], type=str)
 parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0,1], type=int)
 parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=False, type=bool)
 parser.add_argument('--patch_size', help='Patch size for saving', default=256, type=int)
 parser.add_argument('--white_thresh', help='if all RGB pixel values are larger than this value, the pixel is considered as white/background', default=170, type=int)
 parser.add_argument('--black_thresh', help='if all RGB pixel values are smaller or equal than this value, the pixel is considered as black/background', default=0, type=str)
-parser.add_argument('--invalid_ratio_thresh', help='True if each patch should be saved as an image', default=0.5, type=float)
+parser.add_argument('--invalid_ratio_thresh', help='maximum acceptable amount of background', default=0.5, type=float)
 parser.add_argument('--edge_threshold', help='canny edge detection threshold. if smaller than this value, patch gets discarded', default=4, type=int)
 parser.add_argument('--resolution_in_mpp', help='resolution in mpp, usually 10x= 1mpp, 20x=0.5mpp, 40x=0.25, ', default=0, type=float)
 parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float)
@@ -63,8 +64,8 @@ def main(args):
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
     # Get slide files based on the provided path and file extension
-    slide_files = Path(args.slide_path).glob(f'**/*{args.file_extension}')
-
+    slide_files = sorted(Path(args.slide_path).glob(f'**/*{args.file_extension}'))
+    slide_files = [file for file in slide_files if not re.search('_CR_|_CL_', str(file))]
     # Get model dictionaries
     model_dicts = get_models(args.models)
 
@@ -94,19 +95,20 @@ def main(args):
 
     # Create directories
     if args.save_tile_preview:
-        (Path(args.save_path) / 'tiling_previews').mkdir(parents=True, exist_ok=True)
+        tile_path=(Path(args.save_path) / f'tiling_previews_{args.patch_size}px_{args.resolution_in_mpp}mpp_{args.downscaling_factor}xdown_normal')
+        tile_path.mkdir(parents=True, exist_ok=True)
     
 
     # Process slide files
-    for slide_file in slide_files:
+    for slide_file in tqdm(slide_files,position=0,leave=False,desc='slides'):
         slide = slideio.Slide(str(slide_file), driver)
         slide_name = slide_file.stem
-        extract_features(slide, slide_name, model_dicts,device,args)
+        extract_features(slide, slide_name, model_dicts,device,args,tile_path)
 
 
 
 
-def extract_features(slide, slide_name, model_dicts,device,args): 
+def extract_features(slide, slide_name, model_dicts,device,args,tile_path): 
     """
     Extract features from a slide using a given model.
 
@@ -146,13 +148,13 @@ def extract_features(slide, slide_name, model_dicts,device,args):
         #check if RGB or BGR is used and adapt
         if bgr_format(slide.raw_metadata):
             wsi = wsi[..., ::-1]
-            print("Changed BGR to RGB!")
+            #print("Changed BGR to RGB!")
 
         if args.save_tile_preview:
            wsi_copy=wsi.copy()
         
         #iterate over x (width) of scene
-        for x in tqdm(range(0, wsi.shape[0], args.patch_size)):
+        for x in  tqdm(range(0, wsi.shape[0], args.patch_size),position=1,leave=False,desc=slide_name+"_"+str(scn)):
 
             #check if a full patch still 'fits' in x direction
             if x+args.patch_size > wsi.shape[0]:
@@ -195,14 +197,14 @@ def extract_features(slide, slide_name, model_dicts,device,args):
 
         #saves tiling preview on slide in desired size
         if args.save_tile_preview:
-            save_tile_preview(args, slide_name, scn, Image.fromarray(wsi_copy))
+            save_tile_preview(args, slide_name, scn, Image.fromarray(wsi_copy),tile_path)
 
     # Write data to HDF5
     save_hdf5(args, slide_name, coords, feats)
 
-    print(time.time()-time0, " seconds for extraction")                    
+    #print(time.time()-time0, " seconds for extraction")                    
 
-
+    
 if __name__=='__main__':
     args = parser.parse_args() 
     main(args)

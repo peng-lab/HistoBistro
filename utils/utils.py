@@ -118,7 +118,7 @@ def threshold(patch, args):
         return False
 
 
-def save_tile_preview(args, slide_name, scn, preview_im):
+def save_tile_preview(args, slide_name, scn, preview_im, tile_path):
     """
     Save the tile preview image with the specified size.
 
@@ -143,7 +143,7 @@ def save_tile_preview(args, slide_name, scn, preview_im):
         new_height = int(preview_size * aspect_ratio)
 
     preview_im = preview_im.resize((new_width, new_height))
-    preview_im.save(Path(args.save_path) / 'tiling_previews' /
+    preview_im.save(tile_path /
                     f'{slide_name}_{scn}.png')
 
 
