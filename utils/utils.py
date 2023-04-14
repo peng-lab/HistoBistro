@@ -168,4 +168,4 @@ def save_hdf5(args, slide_name, coords, feats):
                 f['args'] = json.dumps(vars(args))
                 f['model_name'] = model_name
         else:
-            print(" WARNING, no features extracted at slide ", slide_name, " reason could be poor slide quality.")
+            print("WARNING, no features extracted at slide", slide_name, "reason could be poor slide quality.")

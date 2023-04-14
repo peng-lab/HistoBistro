@@ -55,3 +55,8 @@ To set up the environment, follow these steps:
 To start feature extraction, change the model paths in `model/model.py` to where you stored the weights, and then call the feature extraction script `feature_extraction.py` in the command line as follows:
 
 ```python feature.py --slide_path /path/to/slides --save_path /path/to/save --file_extension .czi --models kimianet --scene_list 0 1 --save_patch_images True --patch_size 256 --white_thresh 170 --black_thresh 0 --invalid_ratio_thresh 0.5 --edge_threshold 4 --resolution_in_mpp 0 --downscaling_factor 8 -save_tile_preview True --preview_size 4096```
+
+## Continue extraction
+If for some reason the feature extraction was interrupted, you can specify a csv file with all files to extract features. A usefull command to get the not yet extracted features is 
+``` comm -23 <(ls folderA | sed 's/\.[^.]*$//') <(ls folderB | sed 's/\.[^.]*$//') > output.csv```
+which returns all filenames that are in folderA but not folderB.

@@ -1,5 +1,4 @@
 import argparse
-import time
 from pathlib import Path
 
 import cv2
@@ -32,7 +31,7 @@ parser.add_argument('--resolution_in_mpp', help='resolution in mpp, usually 10x=
 parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float)
 parser.add_argument('--save_tile_preview', help='set True if you want nice pictures', default=True, type=bool)
 parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)
-parser.add_argument('--exctraction_list', help='if only a subset of the slides should be extracted save their names in a csv', default=None, type=str)
+parser.add_argument('--exctraction_list', help='if only a subset of the slides should be extracted save their names in a csv', default="/mnt/volume/features/2019/h5_files/output.csv", type=str)
 
 
 
@@ -68,9 +67,9 @@ def main(args):
     slide_files = sorted(Path(args.slide_path).glob(f'**/*{args.file_extension}'))
     
     if args.exctraction_list is not None:
-        to_extract=pd.read_csv(args.exctraction_list)
-        slide_files = [file for file in slide_files if file.name in to_extract]
-    #slide_files = [file for file in slide_files if not re.search('_CR_|_CL_', str(file))]
+        to_extract=pd.read_csv(args.exctraction_list).iloc[:, 0].tolist()
+        slide_files = [file for file in slide_files if file.stem in to_extract]
+    slide_files = [file for file in slide_files if not re.search('_CR_|_CL_', str(file))]
     # Get model dictionaries
     model_dicts = get_models(args.models)
 
