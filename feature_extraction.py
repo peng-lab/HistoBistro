@@ -138,7 +138,7 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path):
 
     
     #iterate over scenes of the slides
-    for scn in range(args.scene_list): #range(slide.num_scenes):
+    for scn in args.scene_list: #range(slide.num_scenes):
             
         wsi_copy=None
         scene=slide.get_scene(scn)
