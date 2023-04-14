@@ -32,6 +32,7 @@ parser.add_argument('--resolution_in_mpp', help='resolution in mpp, usually 10x=
 parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float)
 parser.add_argument('--save_tile_preview', help='set True if you want nice pictures', default=True, type=bool)
 parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)
+parser.add_argument('--exctraction_list', help='if only a subset of the slides should be extracted save their names in a csv', default=None, type=str)
 
 
 
@@ -65,7 +66,11 @@ def main(args):
 
     # Get slide files based on the provided path and file extension
     slide_files = sorted(Path(args.slide_path).glob(f'**/*{args.file_extension}'))
-    slide_files = [file for file in slide_files if not re.search('_CR_|_CL_', str(file))]
+    
+    if args.exctraction_list is not None:
+        to_extract=pd.read_csv(args.exctraction_list)
+        slide_files = [file for file in slide_files if file.name in to_extract]
+    #slide_files = [file for file in slide_files if not re.search('_CR_|_CL_', str(file))]
     # Get model dictionaries
     model_dicts = get_models(args.models)
 
@@ -123,7 +128,7 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path):
     Returns:
         None
     """
-    time0=time.time()
+
 
     feats = {model_dict["name"]: [] for model_dict in model_dicts}
     coords = pd.DataFrame({'scn' : [], 'x' : [], 'y' : []}) 
@@ -133,7 +138,7 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path):
 
     
     #iterate over scenes of the slides
-    for scn in range(slide.num_scenes):
+    for scn in range(args.scene_list): #range(slide.num_scenes):
             
         wsi_copy=None
         scene=slide.get_scene(scn)
@@ -201,8 +206,7 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path):
 
     # Write data to HDF5
     save_hdf5(args, slide_name, coords, feats)
-
-    #print(time.time()-time0, " seconds for extraction")                    
+           
 
     
 if __name__=='__main__':
