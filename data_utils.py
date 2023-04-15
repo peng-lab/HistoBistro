@@ -389,7 +389,7 @@ MSI_cohorts_munich = {
 
 
 def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
-                    target_labels: Iterable[str], categories: Iterable[str], cohort: str, clini_info: bool = False) -> pd.DataFrame:
+                    target_labels: Iterable[str], categories: Iterable[str], cohort: str, clini_info: dict = {}) -> pd.DataFrame:
     
     clini_df = pd.read_csv(clini_table, dtype=str) if Path(clini_table).suffix == '.csv' else pd.read_excel(
         clini_table, dtype=str)
@@ -400,20 +400,17 @@ def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
         'MSI': 'isMSIH',
         'BRAF': 'braf', 'BRAF_mutation': 'braf', 'braf_status': 'braf', 
         'KRAS': 'kras', 'kras_status': 'kras', 'KRAS_mutation': 'kras',
-        'NRAS': 'nras', 'NRAS_mutation': 'nras',  
+        'NRAS': 'nras', 'NRAS_mutation': 'nras',
+        'Age': 'AGE'
     }, axis=1)
 
     # remove columns not in target_labels
     for key in df.columns:
-        if key not in target_labels + ['PATIENT', 'SLIDE', 'FILENAME', 'AGE', 'GENDER', 'LEFT_RIGHT']:
+        if key not in target_labels + ['PATIENT', 'SLIDE', 'FILENAME', *list(clini_info.keys())]:
             df.drop(key, axis=1, inplace=True)
     # remove rows/slides with non-valid labels
     for target in target_labels:
         df = df[df[target].isin(categories)]
-    if clini_info:
-        df = df[df['GENDER'].isin(['female', 'male'])]
-        df = df[df['AGE'].str.isdigit()]
-        df = df[df['LEFT_RIGHT'].isin(['left', 'right'])]
     # remove slides we don't have
     h5s = set(feature_dir.glob('*.h5'))
     assert h5s, f'no features found in {feature_dir}!'
@@ -421,16 +418,60 @@ def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
     # h5_df['FILENAME'] = h5_df.slide_path.map(lambda p: p.stem.split('.')[0])
     h5_df['FILENAME'] = h5_df.slide_path.map(lambda p: p.stem.split('_')[0].split('.')[0]) if cohort=='TCGA' else h5_df.slide_path.map(lambda p: p.stem)
     df = df.merge(h5_df, on='FILENAME')
-
     # reduce to one row per patient with list of slides in `df['slide_path']`
     patient_df = df.groupby('PATIENT').first().drop(columns='slide_path')
     patient_slides = df.groupby('PATIENT').slide_path.apply(list)
     df = patient_df.merge(patient_slides, left_on='PATIENT', right_index=True).reset_index()
-
+        
     return df
 
 
-def get_multi_cohort_df(cohorts: Iterable[str], target_labels: Iterable[str], categories: Iterable[str], norm: str = 'macenko', feats: str = 'ctranspath', aug: str = None, clini_info: bool = False):
+def transform_clini_info(df: pd.DataFrame, label: str, mean: np.ndarray, std: np.ndarray) -> pd.DataFrame:
+    """ transform columns with categorical features to integers and normalize them with given mean and std dev"""
+    # fill missing columns with 0
+    if label not in df.keys():
+        df[label] = 0
+        return df, mean, std
+
+    if label == 'AGE':
+        # only choose rows with valid labels
+        col = df.loc[df[label].str.isdigit().notnull(), label]
+        # map columns to integers
+        col = col.astype(int)
+        # normalize columns
+        if mean is None:
+            mean = col.mean()
+        if std is None:
+            std = col.std()
+        col = (col - mean) / std
+        # add normalized columns back to dataframe
+        df.loc[df[label].str.isdigit().notnull(), label] = col
+        # fill missing values with 0
+        df[label] = df[label].fillna(0)
+    else: 
+        # map columns to integers and non-valid labels to nan
+        codes, uniques = pd.factorize(df[label], sort=True)
+        if label in ['GENDER', 'LEFT_RIGHT']:
+            assert len(uniques) == 2, f'expected 2 categories for {label}, got {len(uniques)}'
+        codes = codes.astype(np.float32)
+        codes[codes==-1.] = np.nan
+        col = codes[~np.isnan(codes)]
+        # normalize columns
+        if mean is None:
+            mean = col.mean()
+        if std is None:
+            std = col.std()
+        col = (col - mean) / std
+        # add normalized columns back to dataframe
+        codes[~np.isnan(codes)] = col
+        df[label] = codes
+        # fill missing values with 0
+        df[label] = df[label].fillna(0)
+
+    return df, mean, std
+
+
+def get_multi_cohort_df(cohorts: Iterable[str], target_labels: Iterable[str], categories: Iterable[str], norm: str = 'macenko', feats: str = 'ctranspath', aug: str = None, clini_info: dict = {}):
     df_list = []
     np_list = []
     for cohort in cohorts:
@@ -443,14 +484,21 @@ def get_multi_cohort_df(cohorts: Iterable[str], target_labels: Iterable[str], ca
         np_list.append(len(current_df.PATIENT))
 
     data = pd.concat(df_list, ignore_index=True)
+    
+    if clini_info:
+        for label in clini_info.keys():
+            data, mean, std = transform_clini_info(data, label, clini_info[label]['mean'], clini_info[label]['std'])
+            clini_info[label]['mean'] = mean
+            clini_info[label]['std'] = std
+
     if len(data.PATIENT) != sum(np_list):
         print(f'number of patients in joint dataset {len(data.PATIENT)} is not equal to the sum of each dataset {sum(np_list)}')
     
-    return data
+    return data, clini_info
 
 
 class MILDatasetIndices(Dataset):
-    def __init__(self, data: pd.DataFrame, indices: Iterable[int], target_labels: Iterable[str], clini_info: bool = False, num_tiles: int = -1, pad_tiles: bool=True, norm: str = 'macenko'):
+    def __init__(self, data: pd.DataFrame, indices: Iterable[int], target_labels: Iterable[str], clini_info: dict = {}, num_tiles: int = -1, pad_tiles: bool=True, norm: str = 'macenko'):
         self.data = data.iloc[indices]
         self.indices = indices
         self.target_labels = target_labels
@@ -515,13 +563,11 @@ class MILDatasetIndices(Dataset):
         label = [label_dict[self.data[target][self.indices[item]]] for target in self.target_labels]
         label = torch.Tensor(label)  # .squeeze(0)
 
-        # add clinical information to feature vector (GENDER, AGE, LEFT_RIGHT)
+        # add clinical information to feature vector
         if self.clini_info:
-            gender = label_dict[self.data['GENDER'][self.indices[item]]]
-            age = int(self.data['AGE'][self.indices[item]])
-            loc = label_dict[self.data['LEFT_RIGHT'][self.indices[item]]]
-            clini_info = torch.Tensor((gender, age, loc)).unsqueeze(0).repeat_interleave(features.shape[0], dim=0)
-            features = torch.concat((features, clini_info), dim=1)
+            for info in self.clini_info.keys():
+                clini_info = torch.Tensor([self.data[info][self.indices[item]]]).unsqueeze(0).repeat_interleave(features.shape[0], dim=0)
+                features = torch.concat((features, clini_info), dim=1)
 
         patient = self.data.PATIENT[self.indices[item]]
 
@@ -533,7 +579,7 @@ class MILDatasetIndices(Dataset):
 
 class MILDataset(Dataset):
     def __init__(self, cohorts: Iterable[str], target_labels: Iterable[str], categories: Iterable[str], norm: str = 'macenko', feats: str = 'retccl',
-                 clini_info: bool = False, num_tiles: int=-1):
+                 clini_info: dict = {}, num_tiles: int=-1):
         self.cohorts = cohorts
         self.clini_info = clini_info
         self.norm = norm
@@ -545,13 +591,19 @@ class MILDataset(Dataset):
             slide_csv = MSI_cohorts_munich[cohort]['slide_csv']
             feature_dir = MSI_cohorts_munich[cohort]['feature_dir'][norm][feats]
 
-            current_df = self.get_cohort_df(clini_table, slide_csv, feature_dir, target_labels, categories, cohort)
+            current_df = self.get_cohort_df(clini_table, slide_csv, feature_dir, target_labels, categories, cohort, clini_info)
             df_list.append(current_df)
             np_list.append(len(current_df.PATIENT))
 
         self.data = pd.concat(df_list, ignore_index=True)
         if len(self.data.PATIENT) != sum(np_list):
             print(f'number of patients in joint dataset {len(self.data.PATIENT)} is not equal to the sum of each dataset {sum(np_list)}')
+            
+        if self.clini_info:
+            for label in self.clini_info.keys():
+                self.data, mean, std = transform_clini_info(self.data, label, self.clini_info[label]['mean'], self.clini_info[label]['std'])
+                self.clini_info[label]['mean'] = mean
+                self.clini_info[label]['std'] = std
 
         self.target_labels = [target_labels] if type(target_labels) is str else target_labels
         self.num_tiles = num_tiles
@@ -611,13 +663,11 @@ class MILDataset(Dataset):
         label = [label_dict[self.data[target][item]] for target in self.target_labels]
         label = torch.Tensor(label)  # .squeeze(0)
 
-        # add clinical information to feature vector (GENDER, AGE, LEFT_RIGHT)
+        # add clinical information to feature vector
         if self.clini_info:
-            gender = label_dict[self.data['GENDER'][item]]
-            age = int(self.data['AGE'][item])
-            loc = label_dict[self.data['LEFT_RIGHT'][item]]
-            clini_info = torch.Tensor((gender, age, loc)).unsqueeze(0).repeat_interleave(features.shape[0], dim=0)
-            features = torch.concat((features, clini_info), dim=1)
+            for info in self.clini_info.keys():
+                clini_info = torch.Tensor([self.data[info][item]]).unsqueeze(0).repeat_interleave(features.shape[0], dim=0)
+                features = torch.concat((features, clini_info), dim=1)
 
         patient = self.data.PATIENT[item]
 
@@ -628,17 +678,21 @@ class MILDataset(Dataset):
 
     def get_cohort_df(self,
                       clini_table: Path, slide_csv: Path, feature_dir: Path,
-                      target_labels: Iterable[str], categories: Iterable[str], cohort: str) -> pd.DataFrame:
+                      target_labels: Iterable[str], categories: Iterable[str], cohort: str, clini_info: dict = {}) -> pd.DataFrame:
         clini_df = pd.read_csv(clini_table, dtype=str) if Path(clini_table).suffix == '.csv' else pd.read_excel(
             clini_table, dtype=str)
         slide_df = pd.read_csv(slide_csv, dtype=str)
         df = clini_df.merge(slide_df, on='PATIENT')
         # adapt dataframe to case sensitive clini tables
+        # TODO implement case insensitive keys
         df = df.rename({
             'MSI': 'isMSIH',
             'BRAF': 'braf', 'BRAF_mutation': 'braf', 'braf_status': 'braf', 
             'KRAS': 'kras', 'kras_status': 'kras', 'KRAS_mutation': 'kras',
-            'NRAS': 'nras', 'NRAS_mutation': 'nras',  
+            'NRAS': 'nras', 'NRAS_mutation': 'nras',
+            'Sex': 'GENDER',
+            'Age': 'AGE',
+            # 'Tumor Site'
         }, axis=1)
 
         # remove columns not in target_labels
@@ -648,10 +702,6 @@ class MILDataset(Dataset):
         # remove rows/slides with non-valid labels
         for target in target_labels:
             df = df[df[target].isin(categories)]
-        if self.clini_info:
-            df = df[df['GENDER'].isin(['female', 'male'])]
-            df = df[df['AGE'].str.isdigit()]
-            df = df[df['LEFT_RIGHT'].isin(['left', 'right'])]
         # remove slides we don't have
         h5s = set(feature_dir.glob('*.h5'))
         assert h5s, f'no features found in {feature_dir}!'
