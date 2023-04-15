@@ -11,7 +11,7 @@ from models.sam import build_sam_vit_h,build_sam_vit_b,build_sam_vit_l
 
 # RetCCL can be downloaded here: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL?usp=sharing
 # kimianet download: https://kimialab.uwaterloo.ca/kimia/?smd_process_download=1&download_id=4216
-RETCCL_PATH = '/mnt/volume/models/retccl.pth'
+RETCCL_PATH = '/home/ubuntu/run/retccl.pth'
 CTRANSPATH_PATH = '/mnt/volume/models/ctranspath.pth'
 KIMIANET_PATH = '/mnt/volume/models/KimiaNetPyTorchWeights.pth'
 SIMCLR_LUNG_PATH= '/mnt/volume/models/rushinssimclr.pth' 
@@ -40,6 +40,13 @@ def get_models(modelnames):
             model=get_sam_vit_b()
         elif modelname.lower()=="sam_vit_l":
             model=get_sam_vit_l()
+        
+        """
+        # torch.compile does not work with DataParallel
+        if torch.cuda.device_count() > 1:
+            print("Using", torch.cuda.device_count(), "GPUs!")
+            model = nn.DataParallel(model)
+        """
         model.to(device)
         model = torch.compile(model)
         model.eval()

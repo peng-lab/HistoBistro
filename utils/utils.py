@@ -7,6 +7,7 @@ import h5py
 import numpy as np
 import torch
 
+from PIL import Image
 
 def bgr_format(xml_string):
     """
@@ -18,7 +19,9 @@ def bgr_format(xml_string):
     Returns:
     - A boolean value indicating whether the image is in BGR format (True) or not (False).
     """
-
+    if xml_string == '':
+        return False
+    
     root = ET.fromstring(xml_string)
     pixel_type_elem = root.findall(".//PixelType")
     return 'bgr' in pixel_type_elem[0].text.lower() if pixel_type_elem is not None else False
@@ -35,10 +38,10 @@ def get_driver(extension_name):
     - A string representing the driver to use for opening the image file.
     """
 
-    if extension_name in ['.tiff', '.jpg', '.jpeg', '.png', '.tif']:
+    if extension_name in ['.tiff', '.tif', '.jpg', '.jpeg', '.png']:
         return 'GDAL'
     elif extension_name == '':
-        return 'DICOM'
+        return 'DCM'
     else:
         return extension_name.replace('.', '').upper()
 
@@ -118,19 +121,38 @@ def threshold(patch, args):
         return False
 
 
-def save_tile_preview(args, slide_name, scn, preview_im, tile_path):
+def save_tile_preview(args, slide_name, scn, wsi, coords, tile_path):
     """
     Save the tile preview image with the specified size.
 
     Args:
-        args (argparse.Namespace): Arguments containing various processing parameters.
-        slide_name (str): Name of the slide file.
-        scn (int): Scene number.
-        preview_im (PIL.Image.Image): The preview image to be saved.
+        args (argparse.Namespace): A Namespace object that contains the arguments passed to the script.
+        slide_name (str): A string representing the name of the slide file.
+        scn (int): An integer representing the scene number.
+        wsi (numpy.ndarray): A NumPy array representing the whole slide image.
+        coords (pandas.DataFrame): A Pandas DataFrame containing the coordinates of the tiles.
+        tile_path (pathlib.Path): A Path object representing the path where the tile preview image will be saved.
 
     Returns:
         None
     """
+
+    # Draw bounding boxes for each tile on the whole slide image
+    def draw_rect(wsi, x, y, size, color=[0, 0, 0], thickness=4):
+        x2, y2 = x + size, y + size
+        wsi[y:y+thickness, x:x+size, :] = color
+        wsi[y:y+size, x:x+thickness, :] = color
+        wsi[y:y+size, x2-thickness:x2, :] = color
+        wsi[y2-thickness:y2, x:x+size, :] = color
+  
+    for _, [_, x, y] in coords.iterrows():
+        draw_rect(wsi, y, x, args.patch_size)
+        #cv2.rectangle(wsi.copy(), (x1, y1), (x2, y2), (0,0,0), thickness=4)
+
+    # Convert NumPy array to PIL Image object
+    preview_im = Image.fromarray(wsi)
+
+    # Determine new dimensions of the preview image while maintaining aspect ratio
     preview_size = int(args.preview_size)
     width, height = preview_im.size
     aspect_ratio = height / width
@@ -142,9 +164,76 @@ def save_tile_preview(args, slide_name, scn, preview_im, tile_path):
         new_width = preview_size
         new_height = int(preview_size * aspect_ratio)
 
+    # Resize the preview image
     preview_im = preview_im.resize((new_width, new_height))
-    preview_im.save(tile_path /
-                    f'{slide_name}_{scn}.png')
+
+    # Save the preview image to disk
+    preview_im.save(tile_path / f'{slide_name}_{scn}.png')
+
+def save_qupath_annotation(args, slide_name, scn, coords, annotation_path):
+    """
+    Saves the QuPath annotation to a geojson file.
+
+    Args:
+        args (Namespace): Arguments for the script.
+        slide_name (str): The name of the slide.
+        scn (int): The SCN number of the slide.
+        coords (pandas.DataFrame): The coordinates for the patches.
+        annotation_path (pathlib.Path): The path to the output directory.
+
+    Returns:
+        None
+    """
+    
+    # Function to create a single annotation feature
+    def create_feature(coordinates, color):
+        
+        # Define the coordinates of the feature polygon
+        x , y = coordinates[0], coordinates[1]
+        top_left = coordinates
+        top_right = [coordinates[0] + args.patch_size, coordinates[1]]
+        bottom_right = [coordinates[0] + args.patch_size, coordinates[1] + args.patch_size]
+        bottom_left = [coordinates[0], coordinates[1] + args.patch_size]
+        coordinates = [top_left, top_right, bottom_right, bottom_left, top_left]
+
+        # Create the feature dictionary with the specified properties
+        feature = {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [coordinates]
+            },
+            "properties": {
+                "objectType": "annotation",
+                "classification": {
+                    "name": f'{x}, {y}', # random name
+                    "color": color
+                }
+            }
+        }
+        return feature
+
+    # Function to create a feature collection from a list of features
+    def create_feature_collection(features):
+        feature_collection = {
+            "type": "FeatureCollection",
+            "features": features
+        }
+        return feature_collection
+    
+    # Define the color of the annotation features
+    color = [255, 0, 0]
+    
+    # Create a list of annotation features from the provided coordinates
+    features = [create_feature([x, y], color) for _, [_, x, y] in coords.iterrows()]
+    
+    # Convert the list of features into a feature collection
+    features = create_feature_collection(features)
+    
+    # Write the feature collection to a GeoJSON file
+    with open(annotation_path / f'{slide_name}_{scn}.geojson', 'w') as annotation_file:
+        # Write the dictionary to the file in JSON format
+        json.dump(features, annotation_file)
 
 
 def save_hdf5(args, slide_name, coords, feats):
@@ -163,7 +252,8 @@ def save_hdf5(args, slide_name, coords, feats):
     for model_name, features in feats.items():
         if len(features)>0:
             with h5py.File(Path(args.save_path) / 'h5_files' / f'{args.patch_size}px_{model_name}_{args.resolution_in_mpp}mpp_{args.downscaling_factor}xdown_normal' / f'{slide_name}.h5', 'w') as f:
-                f['coords'] = coords.astype('float64')
+                f['coords'] = coords.to_records(index=False)
+                #f['coords'] = coords.to_numpy()
                 f['feats'] = torch.cat(features, dim=0).cpu().numpy()
                 f['args'] = json.dumps(vars(args))
                 f['model_name'] = model_name
