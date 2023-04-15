@@ -43,7 +43,7 @@ def main(cfg):
     print('\n--- load dataset ---')
     categories = ['Not mut.', 'Mutat.', 'nonMSIH', 'MSIH', 'WT', 'MUT', 'wt', 'MT']
     data, clini_info = get_multi_cohort_df(
-        cfg.cohorts, [cfg.target], categories, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
+        cfg.data_config, cfg.cohorts, [cfg.target], categories, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
     )
     cfg.clini_info = clini_info
     cfg.input_dim += len(cfg.clini_info.keys())
@@ -51,6 +51,7 @@ def main(cfg):
     test_ext_dataloader = []
     for ext in cfg.ext_cohorts:
         dataset_ext = MILDataset(
+            cfg.data_config,
             [ext], [cfg.target],
             categories,
             norm=norm_test,

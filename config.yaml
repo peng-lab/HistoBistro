@@ -10,6 +10,9 @@ name:
   value: test
 
 # task definition
+data_config:
+  desc: config file for data paths
+  value: /home/ubuntu/projects/idkidc/data_config.yaml
 task:
   desc: training task in ['binary', 'multiclass', 'multilabel']
   value: binary

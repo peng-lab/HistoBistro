@@ -1,4 +1,3 @@
-import random
 from pathlib import Path
 from typing import Iterable
 
@@ -6,386 +5,8 @@ import h5py
 import numpy as np
 import pandas as pd
 import torch
+import yaml
 from torch.utils.data import Dataset
-from torchvision import transforms
-
-
-class PatientFeaturesCoordsDataset(Dataset):
-    def __init__(self, path_label_list, transform=None, target_transform=None, get_coords=False):
-        self.path_label_list = path_label_list
-
-        self.transform = transforms.ToTensor()
-
-        self.target_transform = target_transform
-
-    def __len__(self):
-        return len(self.path_label_list)
-
-    def __getitem__(self, idx):
-        features_coords = torch.load(self.path_label_list[idx][0])
-        stack_features, stack_coords = [], []
-        for i in np.arange(0, len(features_coords)):
-            stack_features.append(features_coords[i][0])
-            stack_coords.append(features_coords[i][1])
-
-        # coordinate ordering: first y then x
-        stack_features = np.stack(stack_features)
-        stack_coords = np.stack(stack_coords)
-        ind = np.lexsort((stack_coords[:, 0], stack_coords[:, 1]))
-        stack_features = stack_features[ind]
-        stack_coords = stack_coords[ind]
-
-        features = torch.from_numpy(stack_features)
-        coords = torch.from_numpy(stack_coords).float()
-        label = torch.tensor(self.path_label_list[idx][1])
-
-        # randomly keep 80% of tiles
-        # p = 0.5
-        # idx = torch.randperm(features.size(0))[:int(features.size(0)*p)]
-        # features = features[idx]
-
-        return features, coords, label
-
-
-class AugPatientFeaturesCoordsDataset(Dataset):
-    def __init__(self, path_label_list, transform=None, target_transform=None, get_coords=False):
-
-        self.path_label_list = path_label_list
-
-        self.transform = transforms.ToTensor()
-
-        self.target_transform = target_transform
-
-    def __len__(self):
-        return len(self.path_label_list)
-
-    def __getitem__(self, idx):
-
-        random_value_aug = random.uniform(0, 1)
-        if random_value_aug > 0.5:
-            rand_dom = random.randrange(0, 6)
-            path = self.path_label_list[idx][0]
-            path = path.replace('/RetCCL_512px_crc_wonorm_diag_frozen/',
-                                f'/RetCCL_512px_crc_histgan_diag_frozen/domain_{rand_dom}/')
-            features_coords = torch.load(path)
-        else:
-            features_coords = torch.load(self.path_label_list[idx][0])
-
-        stack_features, stack_coords = [], []
-        for i in np.arange(0, len(features_coords)):
-            stack_features.append(features_coords[i][0])
-            stack_coords.append(features_coords[i][1])
-
-        # coordinate ordering: first y then x
-        stack_features = np.stack(stack_features)
-        stack_coords = np.stack(stack_coords)
-        ind = np.lexsort((stack_coords[:, 0], stack_coords[:, 1]))
-        stack_features = stack_features[ind]
-        stack_coords = stack_coords[ind]
-
-        features = torch.from_numpy(stack_features)
-        coords = torch.from_numpy(stack_coords).float()
-        label = torch.tensor(self.path_label_list[idx][1])
-
-        # randomly keep 80% of tiles
-        # p = 0.5
-        # idx = torch.randperm(features.size(0))[:int(features.size(0)*p)]
-        # features = features[idx]
-
-        return features, coords, label
-
-
-MSI_cohorts_dresden = {
-    'Rainbow': {
-        'targets': ['braf', 'isMSIH', 'kras', 'nras', 'pik3ca'],
-        'clini_table': Path('/mnt/Mars_03_CRC_WSIs/Jan/desktop/RAINBOW_CRC/RAINBOW-CRCREPROCESS-MM-DX_CLINI.xlsx'),
-        'slide_csv': Path('/mnt/Mars_03_CRC_WSIs/Jan/desktop/RAINBOW_CRC/RAINBOW-CRCREPROCESS-MM-DX_SLIDE.csv'),
-        'feature_dir': Path('/home/janniehues/Documents/CRC_Rainbow/features/Xiyue-Wang/'),
-    },
-    'Quasar': {
-        'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        'clini_table': Path('/home/janniehues/Documents/CRC_Quasar/QUASAR_CLINI_DATA/QUASAR-CRC-DX_CLINI.xlsx'),
-        'slide_csv': Path('/home/janniehues/Documents/CRC_Quasar/QUASAR_CLINI_DATA/QUASAR-CRC-DX_SLIDE.csv'),
-        'feature_dir': Path('/home/janniehues/Documents/CRC_Quasar/features/Xiyue-Wang/'),
-    }
-}
-
-MSI_cohorts_munich = {
-    'Rainbow': {
-        'targets': ['braf', 'isMSIH', 'kras', 'nras', 'pik3ca'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/RAINBOW-CRCREPROCESS-MM-DX_CLINI.xlsx'),
-        # 'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/RAINBOW-CRCREPROCESS-DX_CLINI_MERGED.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/RAINBOW-CRCREPROCESS-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/RAINBOW/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/RAINBOW/features/Macenko/CTransPath/'),    
-            },
-            'raw': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/RAINBOW/features/Raw/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/RAINBOW/features/Raw/Rainbow_HistAuGAN_CTransPath/'),
-            },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/RAINBOW/features/Raw/Rainbow_HistAuGAN_CTransPath/'),
-            },
-        },
-    },
-    'Quasar': {
-        'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/QUASAR-CRC-DX_CLINI_cliniinfo.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/QUASAR-CRC-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/QUASAR/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/QUASAR/features/Macenko/CTransPath/'),
-            },
-            'raw': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/QUASAR/features/Raw/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/QUASAR/features/Raw/Quasar_HistAuGAN_CTransPath/'),
-            },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/QUASAR/features/Raw/Quasar_HistAuGAN_CTransPath/'),
-            },
-        },
-    },
-    'Yorkshire-resections': {
-        'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/YORKSHIRE-RESECTIONS-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/YORKSHIRE-RESECTIONS-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Macenko/CTransPath/')
-            },
-            'raw': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Raw/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Raw/Yorkshire_HistAuGAN_CTransPath/'),
-            },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Raw/Yorkshire_HistAuGAN_CTransPath/'),
-            },
-        },
-    },
-    'Yorkshire-biopsies': {
-        'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/YORKSHIRE-BIOPSIESFULL-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/YORKSHIRE-BIOPSIESFULL-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Macenko/CTransPath/')
-            },
-            'raw': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Raw/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Raw/Yorkshire_HistAuGAN_CTransPath/'),
-            },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Raw/Yorkshire_HistAuGAN_CTransPath/')
-            },
-        },
-    },
-    # 'TCGA': {
-    #     'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-    #     'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/TCGA-CRC-DX_CLINI.xlsx'),
-    #     'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/TCGA-CRC-DX_SLIDE.csv'),
-    #     'feature_dir': {
-    #         'macenko': {
-    #             'retccl': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Macenko/Xiyue-Wang/'),
-    #             'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Macenko/CTransPath/')
-    #         },
-    #         'raw': {
-    #             'retccl': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Raw/Xiyue-Wang/'),
-    #             # 'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Raw/CTransPath-HistAuGAN/'),
-    #             'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Raw/TCGA_HistAuGAN_CTransPath_1/'),
-    #         },
-    #         'histaugan': {
-    #             'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Raw/TCGA_HistAuGAN_CTransPath_1/'),
-    #         },
-    #     },
-    # },
-    'TCGA': {
-        'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        'clini_table': Path('/home/ubuntu/data/TCGA-CRC/TCGA-CRC-DX_CLINI.xlsx'),
-        'slide_csv': Path('/home/ubuntu/data/TCGA-CRC/TCGA-CRC-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/home/ubuntu/data/TCGA-CRC/features/TCGA_Macenko_CTransPath')
-            },
-            'raw': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/marugoto_histaugan'),
-            },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/marugoto_histaugan'),
-            },
-            'efficient_histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/marugoto_efficient_histaugan'),
-            },
-        },
-    },
-    'CPTAC': {
-        'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        # 'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_clinical_data.xlsx'),
-        # 'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_slide.csv'),
-        'clini_table': Path('/home/ubuntu/data/CPTAC-COAD/coad_cptac_2019_clinical_data.xlsx'),
-        'slide_csv': Path('/home/ubuntu/data/CPTAC-COAD/coad_cptac_2019_slide.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Macenko/RetCCL'),
-                # 'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Macenko/CTransPath/')
-                'ctranspath': Path('/home/ubuntu/data/CPTAC-COAD/features/CPTAC_Macenko_CTransPath')
-            },
-            'raw': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Raw/RetCCL'), 
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Raw/CPTAC_HistAuGAN_CTransPath/'),
-                'ctranspath': Path('/content/drive/MyDrive/PhD/data/CPTAC_COAD/features/CPTAC_Macenko_CTransPath'),
-            },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/CPTAC/features/Raw/CPTAC_HistAuGAN_CTransPath/'),
-            },
-        },
-    },
-    'Munich': {
-        'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/MUCBERN-CRC-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/MUCBERN-CRC-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/MUNICH/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/MUNICH/features/Macenko/CTransPath/')
-                },
-            'raw': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/MUNICH/features/Raw/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/MUNICH/features/Raw/MUNICH_HistAuGAN_CTransPath/'),
-            },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/MUNICH/features/Raw/MUNICH_HistAuGAN_CTransPath/'),
-
-            },
-        },
-    },
-    'MECC': {
-        'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/MECC-CRCBATCH1234-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/MECC-CRCBATCH1234-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/MECC/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/MECC/features/Macenko/CTransPath/')
-                },
-            'raw': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/MECC/features/Raw/RetCCL/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/MECC/features/Raw/MECC_HistAuGAN_CTransPath/'),
-                },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/MECC/features/Raw/MECC_HistAuGAN_CTransPath/'),
-                },
-            },
-    },
-    'Duessel': {
-        'targets': ['BRAF', 'isMSIH', 'KRAS', 'NRAS'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/DUSSEL-CRC-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/DUSSEL-CRC-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/DUSSEL/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/DUSSEL/features/Macenko/CTransPath/')
-                },
-            'raw': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/DUSSEL/features/Raw/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/DUSSEL/features/Raw/DUSSEL_HistAuGAN_CTransPath/'),
-                },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/DUSSEL/features/Raw/DUSSEL_HistAuGAN_CTransPath/'),
-                },
-            },
-    },
-    'Dachs': {
-        'targets': ['braf', 'isMSIH', 'kras'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/DACHS-CRC-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/DACHS-CRC-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/DACHS/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/DACHS/features/Macenko/CTransPath/')
-                },
-            'raw': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/DACHS/features/Raw/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/DACHS/features/Raw/Dachs_HistAuGAN_CTransPath/'),
-            },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/DACHS/features/Raw/Dachs_HistAuGAN_CTransPath/'),
-            },
-        },
-    },
-    'Belfast': {
-        'targets': ['braf', 'isMSIH', 'kras'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/BELFAST-CRC-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/BELFAST-CRC-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/BELFAST/features/Macenko/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/BELFAST/features/Macenko/CTransPath/')
-            },
-            'raw': {
-                'retccl': Path('/lustre/groups/peng/datasets/histology_data/BELFAST/features/Raw/Xiyue-Wang/'),
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/BELFAST/features/Raw/BELFAST_HistAuGAN_CTransPath'),
-            },
-            'histaugan': {
-                'ctranspath': Path('/lustre/groups/peng/datasets/histology_data/BELFAST/features/Raw/BELFAST_HistAuGAN_CTransPath/'),
-            },
-        },
-    },
-    # --- STAD cohorts ----------------------------------------------
-    'BERN-STAD': {
-        'targets': ['isMSIH'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/BERN-STAD-Classification-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/BERN-STAD-Classification-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': Path('/lustre/groups/peng/datasets/histology_data/BERN-STAD/features/Macenko/RetCCL/')
-            },
-    },
-    'KCCH-STAD': {
-        'targets': ['isMSIH'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/KCCH-STAD-DX_Wholeslide_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/KCCH-STAD-DX_Wholeslide_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': Path('/lustre/groups/peng/datasets/histology_data/KCCH-STAD/features/Macenko/RetCCL/')
-            },
-    },
-    'KIEL-STAD': {
-        'targets': ['isMSIH'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/KIEL-STAD-DX_GC_Subtype_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/KIEL-STAD-DX-WSI_pythontiles_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': Path('/lustre/groups/peng/datasets/histology_data/KIEL-STAD/features/Macenko/RetCCL/')
-            },
-    },
-    'LEEDS-STAD': {
-        'targets': ['isMSIH'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/LEEDS-STAD-DX_GC_Subtype_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/LEEDS-STAD-DX-WSI_pythontiles_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': Path('/lustre/groups/peng/datasets/histology_data/LEEDS-STAD/features/Macenko/RetCCL/')
-            },
-    },
-    'TCGA-STAD': {
-        'targets': ['isMSIH'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/TCGA-STAD-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/TCGA-STAD-Classification-DX_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': Path('/lustre/groups/peng/datasets/histology_data/TCGA-STAD/features/Macenko/RetCCL/')
-            },
-    },
-    'TUM-STAD': {
-        'targets': ['isMSIH'],
-        'clini_table': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/TUM-STAD-DX_CLINI.xlsx'),
-        'slide_csv': Path('/lustre/groups/peng/datasets/histology_data/clini_tables/TUM-STAD-DX_Wholeslide_SLIDE.csv'),
-        'feature_dir': {
-            'macenko': Path('/lustre/groups/peng/datasets/histology_data/TUM-STAD/features/Macenko/RetCCL/')
-            },
-    },
-}
 
 
 def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
@@ -471,17 +92,21 @@ def transform_clini_info(df: pd.DataFrame, label: str, mean: np.ndarray, std: np
     return df, mean, std
 
 
-def get_multi_cohort_df(cohorts: Iterable[str], target_labels: Iterable[str], categories: Iterable[str], norm: str = 'macenko', feats: str = 'ctranspath', aug: str = None, clini_info: dict = {}):
+def get_multi_cohort_df(data_config: Path, cohorts: Iterable[str], target_labels: Iterable[str], categories: Iterable[str], norm: str = 'macenko', feats: str = 'ctranspath', aug: str = None, clini_info: dict = {}):
     df_list = []
     np_list = []
-    for cohort in cohorts:
-        clini_table = MSI_cohorts_munich[cohort]['clini_table']
-        slide_csv = MSI_cohorts_munich[cohort]['slide_csv']
-        feature_dir = MSI_cohorts_munich[cohort]['feature_dir'][norm][feats]
+    
+    with open(data_config, 'r') as f:
+        data_config = yaml.safe_load(f)
+        
+        for cohort in cohorts:
+            clini_table = Path(data_config[cohort]['clini_table'])
+            slide_csv = Path(data_config[cohort]['slide_csv'])
+            feature_dir = Path(data_config[cohort]['feature_dir'][norm][feats])
 
-        current_df = get_cohort_df(clini_table, slide_csv, feature_dir, target_labels, categories, cohort, clini_info) 
-        df_list.append(current_df)
-        np_list.append(len(current_df.PATIENT))
+            current_df = get_cohort_df(clini_table, slide_csv, feature_dir, target_labels, categories, cohort, clini_info) 
+            df_list.append(current_df)
+            np_list.append(len(current_df.PATIENT))
 
     data = pd.concat(df_list, ignore_index=True)
     
@@ -578,7 +203,7 @@ class MILDatasetIndices(Dataset):
 
 
 class MILDataset(Dataset):
-    def __init__(self, cohorts: Iterable[str], target_labels: Iterable[str], categories: Iterable[str], norm: str = 'macenko', feats: str = 'retccl',
+    def __init__(self, data_config: Path, cohorts: Iterable[str], target_labels: Iterable[str], categories: Iterable[str], norm: str = 'macenko', feats: str = 'retccl',
                  clini_info: dict = {}, num_tiles: int=-1):
         self.cohorts = cohorts
         self.clini_info = clini_info
@@ -586,14 +211,17 @@ class MILDataset(Dataset):
 
         df_list = []
         np_list = []
-        for cohort in cohorts:
-            clini_table = MSI_cohorts_munich[cohort]['clini_table']
-            slide_csv = MSI_cohorts_munich[cohort]['slide_csv']
-            feature_dir = MSI_cohorts_munich[cohort]['feature_dir'][norm][feats]
+        with open(data_config, 'r') as f:
+            data_config = yaml.safe_load(f)
+            
+            for cohort in cohorts:
+                clini_table = Path(data_config[cohort]['clini_table'])
+                slide_csv = Path(data_config[cohort]['slide_csv'])
+                feature_dir = Path(data_config[cohort]['feature_dir'][norm][feats]) 
 
-            current_df = self.get_cohort_df(clini_table, slide_csv, feature_dir, target_labels, categories, cohort, clini_info)
-            df_list.append(current_df)
-            np_list.append(len(current_df.PATIENT))
+                current_df = self.get_cohort_df(clini_table, slide_csv, feature_dir, target_labels, categories, cohort, clini_info)
+                df_list.append(current_df)
+                np_list.append(len(current_df.PATIENT))
 
         self.data = pd.concat(df_list, ignore_index=True)
         if len(self.data.PATIENT) != sum(np_list):
