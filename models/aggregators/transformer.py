@@ -75,8 +75,7 @@ class Transformer(BaseAggregator):
         x = self.transformer(x, register_hook=register_hook)
         x = x.mean(dim=1) if self.pool == 'mean' else x[:, 0]
 
-        # return self.mlp_head(self.norm(x))
-        return self.mlp_head(x)
+        return self.mlp_head(self.norm(x))
 
 
 transformer = Transformer(num_classes=2)
