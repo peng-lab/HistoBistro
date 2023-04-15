@@ -5,6 +5,7 @@ import pandas as pd
 import yaml
 
 import pytorch_lightning as pl
+from pytorch_lightning.tuner import Tuner
 from sklearn.model_selection import StratifiedKFold, train_test_split
 import torch
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -41,9 +42,11 @@ def main(cfg):
     # --------------------------------------------------------
     print('\n--- load dataset ---')
     categories = ['Not mut.', 'Mutat.', 'nonMSIH', 'MSIH', 'WT', 'MUT', 'wt', 'MT']
-    data = get_multi_cohort_df(
-        cfg.cohorts, [cfg.target], categories, norm=cfg.norm, feats=cfg.feats
+    data, clini_info = get_multi_cohort_df(
+        cfg.cohorts, [cfg.target], categories, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
     )
+    cfg.clini_info = clini_info
+    cfg.input_dim += len(cfg.clini_info.keys())
 
     test_ext_dataloader = []
     for ext in cfg.ext_cohorts:
@@ -77,7 +80,8 @@ def main(cfg):
             train_idxs, [cfg.target],
             num_tiles=cfg.num_tiles,
             pad_tiles=cfg.pad_tiles,
-            norm=cfg.norm
+            norm=cfg.norm,
+            clini_info=cfg.clini_info
         )
         patient_df['PATIENT'][train_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_train.csv')
         print(f'num training samples in fold {l}: {len(train_dataset)}')
@@ -86,7 +90,7 @@ def main(cfg):
         )
         
         # validation dataset
-        val_dataset = MILDatasetIndices(data, val_idxs, [cfg.target], norm=norm_val)
+        val_dataset = MILDatasetIndices(data, val_idxs, [cfg.target], norm=norm_val, clini_info=cfg.clini_info)
         patient_df['PATIENT'][val_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_val.csv')
         print(f'num validation samples in fold {l}: {len(val_dataset)}')
         val_dataloader = DataLoader(
@@ -94,7 +98,7 @@ def main(cfg):
         )
 
         # test dataset (in-domain)
-        test_dataset = MILDatasetIndices(data, test_idxs, [cfg.target], norm=norm_test)
+        test_dataset = MILDatasetIndices(data, test_idxs, [cfg.target], norm=norm_test, clini_info=cfg.clini_info)
         patient_df['PATIENT'][test_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_test.csv')
         print(f'num test samples in fold {l}: {len(test_dataset)}')
         test_dataloader = DataLoader(
@@ -139,7 +143,7 @@ def main(cfg):
         )
 
         # --------------------------------------------------------
-        # training
+        # set up and find best learning rate
         # --------------------------------------------------------
         
         trainer = pl.Trainer(
@@ -159,8 +163,12 @@ def main(cfg):
             log_every_n_steps=1,  # debug
             # fast_dev_run=True,    # debug
             # max_steps=6,          # debug
-            # enable_model_summary=False,  # debug
+            enable_model_summary=False,  # debug
         )
+        
+        # --------------------------------------------------------
+        # training
+        # --------------------------------------------------------
 
         results_val = trainer.fit(
             model,
@@ -184,7 +192,6 @@ def main(cfg):
                 ckpt_path='best',
             )
             results[test_cohorts[idx]].append(results_test[0])
-            print(results_test[0])
             # save patient predictions to outputs csv file
             model.outputs.to_csv(result_path / f'fold{l}' / f'outputs_{test_cohorts[idx]}.csv')
             
