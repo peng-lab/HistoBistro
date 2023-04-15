@@ -10,6 +10,9 @@ name:
   value: test
 
 # task definition
+data_config:
+  desc: config file for data paths
+  value: /home/ubuntu/projects/idkidc/data_config.yaml
 task:
   desc: training task in ['binary', 'multiclass', 'multilabel']
   value: binary
@@ -26,8 +29,17 @@ ext_cohorts:
   desc: cohort used for external validation
   value: ["CPTAC"]
 clini_info:
-  desc: whether to use clinical information during training
-  value: false
+  desc: dict with stats for clinical labels to include in training. not used if value = empty dictionary
+  value:
+    AGE:
+      mean: null
+      std: null
+    GENDER:
+      mean: null
+      std: null
+    LEFT_RIGHT:
+      mean: null
+      std: null
 seed:
   desc: random state for splitting the data
   value: null
@@ -49,7 +61,7 @@ num_tiles:
   desc: number of tiles to sample from all tiles
   value: -1
 pad_tiles:
-  desc: whether to pad the tiles up to num_tiles if #tiles is smaller than num_tiles
+  desc: whether to pad the tiles up to num_tiles if number of tiles is smaller than num_tiles
   value: false
 
 # training options
@@ -76,7 +88,7 @@ bs:
   value: 1
 stop_criterion:
   desc: metric for choosing best model
-  value: loss
+  value: auc
 resume:
   desc: path to trained model for evaluation
   value: null
