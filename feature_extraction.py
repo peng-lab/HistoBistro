@@ -70,7 +70,6 @@ def main(args):
 
     # Get slide files based on the provided path and file extension
     slide_files = sorted(Path(args.slide_path).glob(f'**/*{args.file_extension}'))
-    slide_files = [slide_files[99]]
     
     if bool(args.exctraction_list) is not False:
         to_extract=pd.read_csv(args.exctraction_list).iloc[:, 0].tolist()
