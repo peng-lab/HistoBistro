@@ -23,7 +23,7 @@ num_classes:
   desc: number of classes for training
   value: 1
 cohorts:
-  desc: cohort used for training
+  desc: cohort used for training, in the shape ["cohort_name_1", "cohort_name_2"]
   value: ["TCGA"]
 ext_cohorts:
   desc: cohort used for external validation
