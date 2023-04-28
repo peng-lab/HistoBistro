@@ -15,6 +15,9 @@ class ClassifierLightning(pl.LightningModule):
         self.config = config
         self.model = Transformer(num_classes=config.num_classes, input_dim=config.input_dim, pool='cls')
         self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight)
+        
+        # TODO save config file correctly (with self.save_hyperparameters?)
+        self.save_hyperparameters()
 
         self.lr = config.lr
         self.wd = config.wd
@@ -159,6 +162,7 @@ class ClassifierLightning(pl.LightningModule):
         self.log("specificity/test", self.specificity_test, prog_bar=False, on_step=False, on_epoch=True)
 
         # TODO rewrite for batch size > 1 (not needed atm bc bs=1 always in testing mode)
+        # TODO saving of predictions since they are always 0
         outputs = pd.DataFrame(
             data=[[patient[0], y.item(), preds.item(), logits.item(), (y==preds).int().item()]], 
             columns=['patient', 'ground_truth', 'predictions', 'logits', 'correct']
