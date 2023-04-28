@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Tuple
 
 import h5py
 import numpy as np
@@ -44,7 +44,7 @@ def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
     return df
 
 
-def transform_clini_info(df: pd.DataFrame, label: str, mean: np.ndarray, std: np.ndarray) -> pd.DataFrame:
+def transform_clini_info(df: pd.DataFrame, label: str, mean: np.ndarray, std: np.ndarray) -> Tuple[pd.DataFrame, np.ndarray, np.ndarray]:
     """ transform columns with categorical features to integers and normalize them with given mean and std dev"""
     # fill missing columns with 0
     if label not in df.keys():

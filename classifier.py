@@ -160,6 +160,7 @@ class ClassifierLightning(pl.LightningModule):
         self.log("specificity/test", self.specificity_test, prog_bar=False, on_step=False, on_epoch=True)
 
         # TODO rewrite for batch size > 1 (not needed atm bc bs=1 always in testing mode)
+        # TODO saving of predictions since they are always 0
         outputs = pd.DataFrame(
             data=[[patient[0], y.item(), preds.item(), logits.item(), (y==preds).int().item()]], 
             columns=['patient', 'ground_truth', 'predictions', 'logits', 'correct']
