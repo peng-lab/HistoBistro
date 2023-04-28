@@ -15,10 +15,11 @@ class ClassifierLightning(pl.LightningModule):
         self.config = config
         self.model = Transformer(num_classes=config.num_classes, input_dim=config.input_dim, pool='cls')
         self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight)
-
+        # TODO save config file correctly (with self.save_hyperparameters?)
+        self.save_hyperparameters()
+        
         self.lr = config.lr
         self.wd = config.wd
-        # self.num_steps = config.num_steps
 
         self.acc_train = torchmetrics.Accuracy(
             task=config.task, 
