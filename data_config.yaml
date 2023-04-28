@@ -1,14 +1,14 @@
 # TODO make this into a template
 TCGA:
-  # clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/TCGA-CRC-DX_CLINI.xlsx
-  clini_table: /home/ubuntu/data/TCGA-CRC/TCGA-CRC-DX_CLINI.xlsx
-  # slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/TCGA-CRC-DX_SLIDE.csv
-  slide_csv: /home/ubuntu/data/TCGA-CRC/TCGA-CRC-DX_SLIDE.csv
+  clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/TCGA-CRC-DX_CLINI.xlsx
+  # clini_table: /home/ubuntu/data/TCGA-CRC/TCGA-CRC-DX_CLINI.xlsx
+  slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/TCGA-CRC-DX_SLIDE.csv
+  # slide_csv: /home/ubuntu/data/TCGA-CRC/TCGA-CRC-DX_SLIDE.csv
   feature_dir:
     macenko:
       retccl: /lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Macenko/Xiyue-Wang/
-      # ctranspath: /lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Macenko/CTransPath/
-      ctranspath: /home/ubuntu/data/TCGA-CRC/features/TCGA_Macenko_CTransPath/
+      ctranspath: /lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/Macenko/CTransPath/
+      # ctranspath: /home/ubuntu/data/TCGA-CRC/features/TCGA_Macenko_CTransPath/
     raw:
       ctranspath: /lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/marugoto_histaugan/
     histaugan:
@@ -17,22 +17,22 @@ TCGA:
       ctranspath: /lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/marugoto_efficient_histaugan/
 
 CPTAC:
-  # clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_clinical_data.xlsx
-  # slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_slide.csv
-  clini_table: /home/ubuntu/data/CPTAC-COAD/coad_cptac_2019_clinical_data.xlsx
-  slide_csv: /home/ubuntu/data/CPTAC-COAD/coad_cptac_2019_slide.csv
+  clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_clinical_data.xlsx
+  slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_slide.csv
+  # clini_table: /home/ubuntu/data/CPTAC-COAD/coad_cptac_2019_clinical_data.xlsx
+  # slide_csv: /home/ubuntu/data/CPTAC-COAD/coad_cptac_2019_slide.csv
   feature_dir:
     macenko:
       retccl: /lustre/groups/peng/datasets/histology_data/CPTAC/features/Macenko/RetCCL/
-      # ctranspath: /lustre/groups/peng/datasets/histology_data/CPTAC/features/Macenko/CTransPath/
-      ctranspath: /home/ubuntu/data/CPTAC-COAD/features/CPTAC_Macenko_CTransPath/
+      ctranspath: /lustre/groups/peng/datasets/histology_data/CPTAC/features/Macenko/CTransPath/
+      # ctranspath: /home/ubuntu/data/CPTAC-COAD/features/CPTAC_Macenko_CTransPath/
     raw:
       retccl: /lustre/groups/peng/datasets/histology_data/CPTAC/features/Raw/RetCCL/
       ctranspath: /lustre/groups/peng/datasets/histology_data/CPTAC/features/Raw/CPTAC_HistAuGAN_CTransPath/
     histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/CPTAC/features/Raw/CPTAC_HistAuGAN_CTransPath/
     
-Rainbow:
+RAINBOW:
   targets:
     - braf
     - isMSIH
@@ -51,7 +51,7 @@ Rainbow:
     histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/RAINBOW/features/Raw/Rainbow_HistAuGAN_CTransPath/
 
-Quasar:
+QUASAR:
   targets:
     - BRAF
     - isMSIH
@@ -69,7 +69,7 @@ Quasar:
     histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/QUASAR/features/Raw/Quasar_HistAuGAN_CTransPath/
 
-Yorkshire-resections:
+YCR-BCIP-resections:
   targets:
     - BRAF
     - isMSIH
@@ -87,7 +87,7 @@ Yorkshire-resections:
     histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Raw/Yorkshire_HistAuGAN_CTransPath/
 
-Yorkshire-biopsies:
+YCR-BCIP-biopsies:
   targets:
     - BRAF
     - isMSIH
@@ -105,7 +105,7 @@ Yorkshire-biopsies:
     histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/YORKSHIRE/features/Raw/Yorkshire_HistAuGAN_CTransPath/
 
-Munich:
+MUNICH:
   targets:
     - BRAF
     - isMSIH
@@ -141,7 +141,7 @@ MECC:
     histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/MECC/features/Raw/MECC_HistAuGAN_CTransPath/
 
-Duessel:
+DUSSEL:
   targets:
     - BRAF
     - isMSIH
@@ -159,7 +159,7 @@ Duessel:
     histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/DUSSEL/features/Raw/DUSSEL_HistAuGAN_CTransPath/
 
-Dachs:
+DACHS:
   targets:
     - braf
     - isMSIH
@@ -176,7 +176,7 @@ Dachs:
     histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/DACHS/features/Raw/Dachs_HistAuGAN_CTransPath/
 
-Belfast:
+Epi700:
   targets:
     - braf
     - isMSIH
@@ -192,6 +192,46 @@ Belfast:
       ctranspath: /lustre/groups/peng/datasets/histology_data/BELFAST/features/Raw/BELFAST_HistAuGAN_CTransPath/
     histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/BELFAST/features/Raw/BELFAST_HistAuGAN_CTransPath/
+
+TRANSCOT:
+  targets:
+    - isMSIH
+  clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/TRANSCOT-CRC-DX_clini_table.xlsx
+  slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/TRANSCOT-CRC-DX_SLIDE.csv
+  feature_dir:
+    macenko:
+      ctranspath: /lustre/groups/peng/datasets/histology_data/TRANSCOT/features/Macenko/TRANSCOT-CRC-DX_macenko_ctranspath/
+
+FOXTROT:
+  targets:
+    - isMSIH
+  clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/FOXTROT-CRC-DX_CLINI.xlsx
+  slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/FOXTROT-CRC-DX_resection_tumor_slide.csv
+  feature_dir:
+    macenko:
+      ctranspath: /lustre/groups/peng/datasets/histology_data/FOXTROT/features/Macenko/FOXTROT-CRC-DX_macenko_ctranspath/
+    histaugan: 
+      ctranspath: /lustre/groups/peng/datasets/histology_data/FOXTROT/features/FOXTROT-CRC-DX-features-histaugan/
+
+MCO:
+  targets:
+    - isMSIH
+    - BRAF
+    - KRAS
+  clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/MCO-CRC-DX_clini_full_braf_kras.xlsx
+  slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/MCO-CRC-DX_slide.csv
+  feature_dir:
+    macenko:
+      ctranspath: /lustre/groups/peng/datasets/histology_data/MCO-CRC-DX/features/Macenko/CTransPath/
+
+MAINZ:
+  targets:
+    - isMSIH
+  clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/MAINZ-BIOPSIES-CRC-DX_clini.xlsx
+  slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/MAINZ-BIOPSIES-CRC-DX_slide.csv
+  feature_dir:
+    histaugan:
+      ctranspath: /lustre/groups/peng/datasets/histology_data/MAINZ-BIOPSIES-CRC-DX/features/CTransPath_HistAuGAN/
 
 # STAD cohorts
 BERN-STAD:
