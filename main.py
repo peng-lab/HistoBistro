@@ -1,21 +1,21 @@
-from pathlib import Path
-import numpy as np
 import argparse
+import os
+from pathlib import Path
+
+import numpy as np
 import pandas as pd
-import yaml
-
 import pytorch_lightning as pl
-from pytorch_lightning.tuner import Tuner
-from sklearn.model_selection import StratifiedKFold, train_test_split
 import torch
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger, CSVLogger
-from torch.utils.data import DataLoader
 import wandb
+import yaml
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import CSVLogger, WandbLogger
+from sklearn.model_selection import StratifiedKFold, train_test_split
+from torch.utils.data import DataLoader
 
-from options import Options
-from data_utils import MILDataset, MILDatasetIndices, get_multi_cohort_df
 from classifier import ClassifierLightning
+from data_utils import MILDataset, MILDatasetIndices, get_multi_cohort_df
+from options import Options
 from utils import save_results
 
 
@@ -48,6 +48,14 @@ def main(cfg):
     cfg.clini_info = clini_info
     cfg.input_dim += len(cfg.clini_info.keys())
 
+    for cohort in cfg.cohorts:
+        if cohort in cfg.ext_cohorts:
+            cfg.ext_cohorts.pop(cfg.ext_cohorts.index(cohort))
+
+    train_cohorts = f'{", ".join(cfg.cohorts)}'
+    test_cohorts = [train_cohorts, *cfg.ext_cohorts]
+    results = {t: [] for t in test_cohorts}
+
     test_ext_dataloader = []
     for ext in cfg.ext_cohorts:
         dataset_ext = MILDataset(
@@ -58,12 +66,11 @@ def main(cfg):
             feats=cfg.feats,
             clini_info=cfg.clini_info
         )
-        test_ext_dataloader.append(DataLoader(dataset=dataset_ext, batch_size=1, shuffle=False, num_workers=14, pin_memory=True))
+        test_ext_dataloader.append(DataLoader(dataset=dataset_ext, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True))
+    
+    print(f'training cohorts: {train_cohorts}')
+    print(f'testing cohorst:  {cfg.ext_cohorts}')
         
-    train_cohorts = f'{", ".join(cfg.cohorts)}'
-    test_cohorts = [train_cohorts, *cfg.ext_cohorts]
-    results = {t: [] for t in test_cohorts}
-
     # --------------------------------------------------------
     # k-fold cross validation
     # --------------------------------------------------------
@@ -87,7 +94,7 @@ def main(cfg):
         patient_df['PATIENT'][train_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_train.csv')
         print(f'num training samples in fold {l}: {len(train_dataset)}')
         train_dataloader = DataLoader(
-            dataset=train_dataset, batch_size=cfg.bs, shuffle=True, num_workers=14, pin_memory=True
+            dataset=train_dataset, batch_size=cfg.bs, shuffle=True, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
         )
         
         # validation dataset
@@ -95,7 +102,7 @@ def main(cfg):
         patient_df['PATIENT'][val_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_val.csv')
         print(f'num validation samples in fold {l}: {len(val_dataset)}')
         val_dataloader = DataLoader(
-            dataset=val_dataset, batch_size=1, shuffle=False, num_workers=14, pin_memory=True
+            dataset=val_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
         )
 
         # test dataset (in-domain)
@@ -103,7 +110,7 @@ def main(cfg):
         patient_df['PATIENT'][test_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_test.csv')
         print(f'num test samples in fold {l}: {len(test_dataset)}')
         test_dataloader = DataLoader(
-            dataset=test_dataset, batch_size=1, shuffle=False, num_workers=14, pin_memory=True
+            dataset=test_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
         )
 
         # idx=2 since the ouput is feats, coords, labels
@@ -125,6 +132,7 @@ def main(cfg):
             save_dir=cfg.save_dir,
             reinit=True,
             settings=wandb.Settings(start_method='fork'),
+            mode='offline'
         )
 
         csv_logger = CSVLogger(
@@ -150,18 +158,19 @@ def main(cfg):
         trainer = pl.Trainer(
             logger=[logger, csv_logger],
             accelerator='auto',
-            precision='16-mixed',
-            accumulate_grad_batches=4,
-            gradient_clip_val=1,
+            # precision='16',
+            # accumulate_grad_batches=4,
+            # gradient_clip_val=1,
             callbacks=[checkpoint_callback],
             max_epochs=cfg.num_epochs,
             # track_grad_norm=2,      # debug
             # num_sanity_val_steps=0,  # debug
-            # val_check_interval=0.1,  # debug
+            val_check_interval=500,  # debug
+            check_val_every_n_epoch=None,
             # limit_val_batches=0.1,  # debug
             # limit_train_batches=6,  # debug
             # limit_val_batches=6,    # debug
-            log_every_n_steps=1,  # debug
+            # log_every_n_steps=1,  # debug
             # fast_dev_run=True,    # debug
             # max_steps=6,          # debug
             enable_model_summary=False,  # debug
