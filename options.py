@@ -6,8 +6,7 @@ class Options:
         self.parser = argparse.ArgumentParser()
 
         # logging options
-        # self.parser.add_argument('--config_file', default='/home/ubuntu/projects/idkidc/config.yaml', type=str, help='path to config file')
-        self.parser.add_argument('--config_file', default='/home/haicu/sophia.wagner/projects/idkidc/config.yaml', type=str, help='path to config file')
+        self.parser.add_argument('--config_file', default='config.yaml', type=str, help='path to config file')
         self.parser.add_argument('--data_config', type=str, help='path to config file for data paths')
         self.parser.add_argument('--save_dir', type=str, help='path to save models, outputs, and folds')
         self.parser.add_argument('--project', type=str, help='wandb project name')
