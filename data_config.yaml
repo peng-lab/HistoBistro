@@ -1,4 +1,15 @@
 # TODO make this into a template
+CHINA:
+  targets:
+    - isMSIH
+  clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/CHINA-CRC-DX_clini.xlsx
+  slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/CHINA-CRC-DX_slide.csv
+  feature_dir:
+    histaugan:
+      ctranspath: /lustre/groups/peng/datasets/histology_data/CHINA-CRC-DX/features/
+    raw:
+      ctranspath: /lustre/groups/peng/datasets/histology_data/CHINA-CRC-DX/features/raw_ctranspath
+
 CPTAC:
   clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_clinical_data.xlsx
   slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/coad_cptac_2019_slide.csv
@@ -66,6 +77,17 @@ Epi700:
       ctranspath: /lustre/groups/peng/datasets/histology_data/BELFAST/features/Raw/BELFAST_HistAuGAN_CTransPath/
     histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/BELFAST/features/Raw/BELFAST_HistAuGAN_CTransPath/
+
+ERLANGEN:
+  targets:
+    - isMSIH
+  clini_table: /lustre/groups/peng/datasets/histology_data/clini_tables/ERLANGEN-CRC-DX_clini.xlsx
+  slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/ERLANGEN-CRC-DX_slide.csv
+  feature_dir:
+    histaugan:
+      ctranspath: /lustre/groups/peng/datasets/histology_data/ERLANGEN/features/
+    raw:
+      ctranspath: /lustre/groups/peng/datasets/histology_data/ERLANGEN/features/
 
 FOXTROT:
   targets:
