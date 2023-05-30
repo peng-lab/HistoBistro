@@ -6,8 +6,7 @@ class Options:
         self.parser = argparse.ArgumentParser()
 
         # logging options
-        # self.parser.add_argument('--config_file', default='/home/ubuntu/projects/idkidc/config.yaml', type=str, help='path to config file')
-        self.parser.add_argument('--config_file', default='/home/haicu/sophia.wagner/projects/idkidc/config.yaml', type=str, help='path to config file')
+        self.parser.add_argument('--config_file', default='config.yaml', type=str, help='path to config file')
         self.parser.add_argument('--data_config', type=str, help='path to config file for data paths')
         self.parser.add_argument('--save_dir', type=str, help='path to save models, outputs, and folds')
         self.parser.add_argument('--project', type=str, help='wandb project name')
@@ -32,6 +31,7 @@ class Options:
         self.parser.add_argument('--folds', type=int, help='number of folds')
         self.parser.add_argument('--num_epochs', type=int, help='number of epochs')
         self.parser.add_argument('--optimizer', type=str, help='optimizer for model training')
+        self.parser.add_argument('--criterion', type=str, help=' loss function for model training')
         self.parser.add_argument('--scheduler', type=str, help='scheduler for model training')
         self.parser.add_argument('--lr', type=float, help='learning rate')
         self.parser.add_argument('--wd', type=float, help='weight decay')
