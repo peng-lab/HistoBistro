@@ -80,6 +80,9 @@ criterion:
 optimizer:
   desc: optimizer for model training
   value: AdamW
+criterion: 
+  desc: loss function for model training
+  value: BCEWithLogitsLoss
 scheduler:
   desc: scheduler for model training
   value: null
