@@ -2,7 +2,7 @@
 save_dir:
   desc: path to save models, outputs, and folds
   # value: /home/ubuntu/logs
-  value: /lustre/groups/peng/workspace/sophia.wagner/logs
+  value: /lustre/groups/peng/workspace/sophia.wagner/logs/idkidc
 project:
   desc: wandb project name
   value: hackathon
@@ -26,13 +26,13 @@ num_classes:
   value: 1
 cohorts:
   desc: cohort used for training, in the shape ["cohort_name_1", "cohort_name_2"]
-  value: ["MAINZ"]
+  value: ["MCO"]
 ext_cohorts:
   desc: cohort used for external validation
   # value: ["MCO", "DACHS", "QUASAR", "RAINBOW", "TCGA", "Epi700"]
-  value: ["TCGA"]
+  value: ["MCO", "DACHS", "QUASAR", "RAINBOW", "TCGA", "Epi700", "CPTAC", "DUSSEL", "MECC", "MUNICH", "YCR-BCIP-resections", "YCR-BCIP-biopsies", "FOXTROT", "MAINZ"]
 clini_info:
-  desc: dict with stats for clinical labels to include in training. not used if value = empty dictionary
+  desc: dict with stats for clinical labels to include in training. not used if value = {} (empty dictionary)
   value: {}
     # AGE:
     #   mean: null
@@ -73,7 +73,10 @@ folds:
   value: 5
 num_epochs:
   desc: number of epochs
-  value: 8
+  value: 1
+criterion: 
+  desc: loss function for model training
+  value: BCEWithLogitsLoss
 optimizer:
   desc: optimizer for model training
   value: AdamW
@@ -95,6 +98,9 @@ bs:
 stop_criterion:
   desc: metric for choosing best model
   value: loss
+val_check_interval:
+  desc: interval to evaluate on validation set
+  value: 500
 resume:
   desc: path to trained model for evaluation
   value: null
