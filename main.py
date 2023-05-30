@@ -69,7 +69,7 @@ def main(cfg):
         test_ext_dataloader.append(DataLoader(dataset=dataset_ext, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True))
     
     print(f'training cohorts: {train_cohorts}')
-    print(f'testing cohorst:  {cfg.ext_cohorts}')
+    print(f'testing cohorts:  {cfg.ext_cohorts}')
         
     # --------------------------------------------------------
     # k-fold cross validation
@@ -80,8 +80,17 @@ def main(cfg):
     splits = skf.split(patient_df, patient_df[target_stratisfy])
 
     for l, (train_val_idxs, test_idxs) in enumerate(splits):
-        train_idxs, val_idxs = train_test_split( train_val_idxs, stratify=patient_df.iloc[train_val_idxs][target_stratisfy], random_state=cfg.seed)
-        
+        # read split from csv-file if exists already
+        if Path(fold_path / f'folds_{cfg.logging_name}_fold{l}_train.csv').exists():
+            train_idxs = pd.read_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_train.csv', index_col='Unnamed: 0').index
+            val_idxs = pd.read_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_val.csv', index_col='Unnamed: 0').index
+            test_idxs = pd.read_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_test.csv', index_col='Unnamed: 0').index
+        else:
+            train_idxs, val_idxs = train_test_split(train_val_idxs, stratify=patient_df.iloc[train_val_idxs][target_stratisfy], random_state=cfg.seed)
+            patient_df['PATIENT'][train_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_train.csv')
+            patient_df['PATIENT'][val_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_val.csv')
+            patient_df['PATIENT'][test_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_test.csv')
+
         # training dataset
         train_dataset = MILDatasetIndices(
             data,
@@ -91,15 +100,15 @@ def main(cfg):
             norm=cfg.norm,
             clini_info=cfg.clini_info
         )
-        patient_df['PATIENT'][train_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_train.csv')
         print(f'num training samples in fold {l}: {len(train_dataset)}')
         train_dataloader = DataLoader(
             dataset=train_dataset, batch_size=cfg.bs, shuffle=True, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
         )
+        if len(train_dataset) < cfg.val_check_interval:
+            cfg.val_check_interval = len(train_dataset)
         
         # validation dataset
         val_dataset = MILDatasetIndices(data, val_idxs, [cfg.target], norm=norm_val, clini_info=cfg.clini_info)
-        patient_df['PATIENT'][val_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_val.csv')
         print(f'num validation samples in fold {l}: {len(val_dataset)}')
         val_dataloader = DataLoader(
             dataset=val_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
@@ -107,7 +116,6 @@ def main(cfg):
 
         # test dataset (in-domain)
         test_dataset = MILDatasetIndices(data, test_idxs, [cfg.target], norm=norm_test, clini_info=cfg.clini_info)
-        patient_df['PATIENT'][test_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_test.csv')
         print(f'num test samples in fold {l}: {len(test_dataset)}')
         test_dataloader = DataLoader(
             dataset=test_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
@@ -158,14 +166,9 @@ def main(cfg):
         trainer = pl.Trainer(
             logger=[logger, csv_logger],
             accelerator='auto',
-            # precision='16',
-            # accumulate_grad_batches=4,
-            # gradient_clip_val=1,
             callbacks=[checkpoint_callback],
             max_epochs=cfg.num_epochs,
-            # track_grad_norm=2,      # debug
-            # num_sanity_val_steps=0,  # debug
-            val_check_interval=500,  # debug
+            val_check_interval=cfg.val_check_interval,
             check_val_every_n_epoch=None,
             # limit_val_batches=0.1,  # debug
             # limit_train_batches=6,  # debug
@@ -180,13 +183,16 @@ def main(cfg):
         # training
         # --------------------------------------------------------
 
-        results_val = trainer.fit(
-            model,
-            train_dataloader,
-            val_dataloader,
-            ckpt_path=cfg.resume,
-        )
-        logger.log_table('results/val', results_val)
+        if Path(f'best_model_{cfg.logging_name}_fold{l}').exists():
+            pass
+        else: 
+            results_val = trainer.fit(
+                model,
+                train_dataloader,
+                val_dataloader,
+                ckpt_path=cfg.resume,
+            )
+            logger.log_table('results/val', results_val)
         
         # --------------------------------------------------------
         # testing
@@ -195,7 +201,14 @@ def main(cfg):
         # TODO write test function in separate file (read test split from csv files created above, load correct models for folds)
         # TODO rewrite for multiple dataloader (problem: how to save results to csv with correct name?)
         test_cohorts_dataloader = [test_dataloader, *test_ext_dataloader]
+        # test_cohorts_evaluated = []
         for idx in range(len(test_cohorts)):
+            # skip evaluation if it was already performed
+            # if Path(result_path / f'fold{l}' / f'outputs_{test_cohorts[idx]}.csv').exists():
+            #     pass
+            # else: 
+            print("Testing: ", test_cohorts[idx])
+            # test_cohorts_evaluated.append(test_cohorts[idx])
             results_test = trainer.test(
                 model,
                 test_cohorts_dataloader[idx],
@@ -204,6 +217,11 @@ def main(cfg):
             results[test_cohorts[idx]].append(results_test[0])
             # save patient predictions to outputs csv file
             model.outputs.to_csv(result_path / f'fold{l}' / f'outputs_{test_cohorts[idx]}.csv')
+        
+        # remove results entries for not evaluated test cohorts
+        # for test_cohort in test_cohorts:
+        #     if test_cohort not in test_cohorts_evaluated:
+        #         results.pop(test_cohort)
             
         wandb.finish()  # required for new wandb run in next fold
             
