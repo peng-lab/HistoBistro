@@ -6,7 +6,9 @@ CHINA:
   slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/CHINA-CRC-DX_slide.csv
   feature_dir:
     histaugan:
-      ctranspath: /lustre/groups/peng/datasets/histology_data/CHINA-CRC-DX/features/
+      ctranspath: /lustre/groups/peng/datasets/histology_data/CHINA-CRC-DX/features/histaugan_ctranspath
+    macenko:
+      ctranspath: /lustre/groups/peng/datasets/histology_data/CHINA-CRC-DX/features/histaugan_macenko_ctranspath
     raw:
       ctranspath: /lustre/groups/peng/datasets/histology_data/CHINA-CRC-DX/features/raw_ctranspath
 
@@ -85,9 +87,9 @@ ERLANGEN:
   slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/ERLANGEN-CRC-DX_slide.csv
   feature_dir:
     histaugan:
-      ctranspath: /lustre/groups/peng/datasets/histology_data/ERLANGEN/features/
+      ctranspath: /lustre/groups/peng/datasets/histology_data/ERLANGEN/features/histaugan_ctranspath
     raw:
-      ctranspath: /lustre/groups/peng/datasets/histology_data/ERLANGEN/features/
+      ctranspath: /lustre/groups/peng/datasets/histology_data/ERLANGEN/features/raw_ctranspath
 
 FOXTROT:
   targets:
@@ -225,6 +227,10 @@ TRANSCOT:
   slide_csv: /lustre/groups/peng/datasets/histology_data/clini_tables/TRANSCOT-CRC-DX_SLIDE.csv
   feature_dir:
     macenko:
+      ctranspath: /lustre/groups/peng/datasets/histology_data/TRANSCOT/features/Macenko/TRANSCOT-CRC-DX_macenko_ctranspath/
+    raw:  # careful: still macenko!
+      ctranspath: /lustre/groups/peng/datasets/histology_data/TRANSCOT/features/Macenko/TRANSCOT-CRC-DX_macenko_ctranspath/
+    histaugan:  # careful: still macenko!
       ctranspath: /lustre/groups/peng/datasets/histology_data/TRANSCOT/features/Macenko/TRANSCOT-CRC-DX_macenko_ctranspath/
 
 YCR-BCIP-biopsies:
