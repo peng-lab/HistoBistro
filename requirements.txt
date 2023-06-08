@@ -1,13 +1,24 @@
 h5py==3.8.0
 joblib==1.2.0
-numpy==1.24.1
 opencv-python==4.7.0.72
 pandas==1.5.3
 Pillow==9.3.0
 slideio==2.0.5
-timm-0.5.4.tar
-torch==2.1.0.dev20230315+cu117
-torchaudio==2.0.0.dev20230316+cu117
-torchvision==0.15.0.dev20230315+cu117
 tqdm 
+torch==1.13.0
+torchvision==0.14.0
+torchaudio==0.13.0
+pytorchvideo @ git+https://github.com/facebookresearch/pytorchvideo.git@28fe037d212663c6a24f373b94cc5d478c8c1a1d
+timm==0.6.7
+ftfy
+regex
+einops
+fvcore
+decord==0.6.0
+iopath
+numpy
+matplotlib
+types-regex
+mayavi
+transformers
 
