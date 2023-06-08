@@ -3,3 +3,6 @@ h5_files/*
 *__pycache__*
 *.png
 *.out
+**.pt
+**.pth
+*.checkpoints*
