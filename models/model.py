@@ -8,6 +8,8 @@ from models.kimianet import load_kimianet
 from models.resnet_retccl import resnet50 as retccl_res50
 from models.simsalabim import ResNetSimCLR
 from models.sam import build_sam_vit_h,build_sam_vit_b,build_sam_vit_l
+from models.imagebind import imagebind_huge
+from transformers import BeitForImageClassification, Data2VecVisionForImageClassification
 
 # RetCCL can be downloaded here: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL?usp=sharing
 # kimianet download: https://kimialab.uwaterloo.ca/kimia/?smd_process_download=1&download_id=4216
@@ -40,6 +42,15 @@ def get_models(modelnames):
             model=get_sam_vit_b()
         elif modelname.lower()=="sam_vit_l":
             model=get_sam_vit_l()
+        elif modelname.lower() in ['dinov2_vits14','dinov2_vitb14','dinov2_vitl14','dinov2_vitg14']:
+            model=torch.hub.load('facebookresearch/dinov2', modelname.lower())
+        elif modelname.lower()=="imagebind":
+            model=get_imagebind()
+        elif modelname.lower()=='beit_microsoft':
+            model = BeitForImageClassification.from_pretrained('microsoft/beit-base-patch16-224-pt22k-ft22k')
+        elif modelname.lower()=='beit_fb':
+            model = Data2VecVisionForImageClassification.from_pretrained('facebook/data2vec-vision-base-ft1k')
+
         
         """
         # torch.compile does not work with DataParallel
@@ -48,11 +59,13 @@ def get_models(modelnames):
             model = nn.DataParallel(model)
         """
         model.to(device)
-        model = torch.compile(model)
+        #model = torch.compile(model)
         model.eval()
         transforms = get_transforms(modelname)
-        models.append({'name': modelname, 'model': torch.compile(
-            model.to(device)), 'transforms': transforms})
+        #models.append({'name': modelname, 'model': torch.compile(
+        #    model.to(device)), 'transforms': transforms})
+        models.append({'name': modelname, 'model': 
+            model.to(device), 'transforms': transforms})
     return models
 
 def get_sam_vit_h():
@@ -79,6 +92,7 @@ def get_ctranspath():
     model.load_state_dict(pretrained['model'], strict=True)
     return model
 
+
 def get_kimianet():
     return load_kimianet(KIMIANET_PATH)
 
@@ -102,6 +116,10 @@ def get_res50():
 
     return model
 
+def get_imagebind(pretrained=True):
+    model = imagebind_huge(pretrained=pretrained)
+    return model
+
 def multiply_by_255(img):
     return img * 255
 
@@ -110,17 +128,23 @@ def get_transforms(model_name):
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
 
-    if model_name.lower() in ['ctranspath', 'resnet50',"simclr_lung"]:
+    if model_name.lower() in ['ctranspath', 'resnet50',"simclr_lung", 'beit_fb','beit_microsoft']:
         resolution = 224
     elif model_name.lower() == 'retccl':
         resolution = 256
     elif model_name.lower() == 'kimianet':
         resolution = 1000
+    elif model_name.lower() == 'imagebind':
+        resolution = 224
+        mean=(0.48145466, 0.4578275, 0.40821073)
+        std=(0.26862954, 0.26130258, 0.27577711)
+    # change later to correct value
+    elif model_name.lower() in ['dinov2_vits14','dinov2_vitb14','dinov2_vitl14','dinov2_vitg14']:
+        resolution = 252
     elif "sam" in model_name.lower():
         resolution = 1024
         mean=(123.675, 116.28, 103.53)
         std=(58.395, 57.12, 57.375)
-
     else:
         raise ValueError('Model name not found')
 
