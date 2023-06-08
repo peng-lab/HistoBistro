@@ -236,26 +236,24 @@ def save_qupath_annotation(args, slide_name, scn, coords, annotation_path):
         json.dump(features, annotation_file)
 
 
-def save_hdf5(args, slide_name, coords, feats):
+def save_hdf5(args, slide_name, coords, feats,slide_sizes):
     """
     Save the extracted features and coordinates to an HDF5 file.
-
     Args:
         args (argparse.Namespace): Arguments containing various processing parameters.
         slide_name (str): Name of the slide file.
         coords (pd.DataFrame): Coordinates of the extracted patches.
         feats (dict): dictionary: modelname: extracted features
-
     Returns:
         None
-    """
+    """"
     for model_name, features in feats.items():
         if len(features)>0:
-            with h5py.File(Path(args.save_path) / 'h5_files' / f'{args.patch_size}px_{model_name}_{args.resolution_in_mpp}mpp_{args.downscaling_factor}xdown_normal' / f'{slide_name}.h5', 'w') as f:
-                f['coords'] = coords.to_records(index=False)
-                #f['coords'] = coords.to_numpy()
-                f['feats'] = torch.cat(features, dim=0).cpu().numpy()
-                f['args'] = json.dumps(vars(args))
-                f['model_name'] = model_name
+            with h5py.File(Path(args.save_path) / 'h5_files' / f’{args.patch_size}px_{model_name}_{args.resolution_in_mpp}mpp_{args.downscaling_factor}xdown_normal’ / f’{slide_name}.h5', ‘w’) as f:
+                f[‘coords’] = coords.astype(‘float64’)
+                f[‘feats’] = torch.cat(features, dim=0).cpu().numpy()
+                f[‘args’] = json.dumps(vars(args))
+                f[‘model_name’] = model_name
+                f[‘slide_sizes’]=slide_sizes
         else:
-            print("WARNING, no features extracted at slide", slide_name, "reason could be poor slide quality.")
+            print(“WARNING, no features extracted at slide”, slide_name, “reason could be poor slide quality.“)

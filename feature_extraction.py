@@ -153,10 +153,11 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path, annot
     if args.save_patch_images:
         (Path(args.save_path) / 'patches'/ slide_name).mkdir(parents=True, exist_ok=True)
 
+    orig_sizes=[]
     #iterate over scenes of the slides
-    for scn in args.scene_list: #range(slide.num_scenes):
-            
+    for scn in range(slide.num_scenes):
         scene=slide.get_scene(scn)
+        orig_sizes.append(scene.size)   
         scaling=get_scaling(args,scene.resolution[0])
 
         #read the scene in the desired resolution
@@ -244,7 +245,7 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path, annot
             save_qupath_annotation(args, slide_name, scn, coords, annotation_path)
 
     # Write data to HDF5
-    save_hdf5(args, slide_name, coords, feats)
+    save_hdf5(args, slide_name, coords, feats,orig_sizes)
            
 
     
