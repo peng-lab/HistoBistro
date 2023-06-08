@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-import cv2
+#import cv2
 import numpy as np
 import pandas as pd
 import slideio
@@ -18,13 +18,14 @@ from utils.utils import (bgr_format, get_driver, get_scaling,
 
 import concurrent.futures
 import time
+from transformers import BeitImageProcessor, BeitFeatureExtractor
 
 parser = argparse.ArgumentParser(description='Feature extraction')
 
-parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/slides/augsburg_data', type=str)
-parser.add_argument('--save_path', help='path to save everything', default='/home/ubuntu/run/0', type=str)
-parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.tiff', type=str)
-parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['retccl'], type=str)
+parser.add_argument('--slide_path', help='path of slides to extract features from', default='C:/Users/Bened/Master_Thesis/one_test_image', type=str) 
+parser.add_argument('--save_path', help='path to save everything', default='C:/Users/Bened/Master_Thesis/results', type=str)               
+parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)                       
+parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['beit_fb', 'imagebind','dinov2_vits14'], type=str)   
 parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0], type=int)
 parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=True, type=bool)
 parser.add_argument('--patch_size', help='Patch size for saving', default=256, type=int)
@@ -33,9 +34,9 @@ parser.add_argument('--black_thresh', help='if all RGB pixel values are smaller 
 parser.add_argument('--invalid_ratio_thresh', help='maximum acceptable amount of background', default=0.5, type=float)
 parser.add_argument('--edge_threshold', help='canny edge detection threshold. if smaller than this value, patch gets discarded', default=4, type=int)
 parser.add_argument('--resolution_in_mpp', help='resolution in mpp, usually 10x= 1mpp, 20x=0.5mpp, 40x=0.25, ', default=0, type=float)
-parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=1, type=float)
+parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float) # original: 1
 parser.add_argument('--save_tile_preview', help='set True if you want nice pictures', default=True, type=bool)
-parser.add_argument('--preview_size', help='size of tile_preview', default=20000, type=int)
+parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)                                                         # original: 20000
 parser.add_argument('--exctraction_list', help='if only a subset of the slides should be extracted save their names in a csv', default="", type=str)
 parser.add_argument('--save_qupath_annotation', help='set True if you want nice qupath annotations', default=True, type=bool)
 
@@ -212,9 +213,20 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path, annot
                             model=model_dict['model']
                             transform=model_dict['transforms']
                             model_name=model_dict['name']
-                            img_t = transform(im)
-                            batch_t = img_t.unsqueeze(0).to(device)
-                            features = model(batch_t)
+                            if model_name == 'beit_microsoft':
+                                processor = BeitImageProcessor.from_pretrained('microsoft/beit-base-patch16-224-pt22k-ft22k')
+                                inputs = processor(images=im, return_tensors="pt")
+                                outputs = model(**inputs)
+                                features = outputs.logits
+                            elif model_name == 'beit_fb':
+                                feature_extractor = BeitFeatureExtractor.from_pretrained('facebook/data2vec-vision-base-ft1k')
+                                inputs = feature_extractor(images=im, return_tensors="pt")
+                                outputs = model(**inputs)
+                                features = outputs.logits
+                            else:
+                                img_t = transform(im)
+                                batch_t = img_t.unsqueeze(0).to(device)
+                                features = model(batch_t)
                             feats[model_name].append(features)
 
                 return feats
