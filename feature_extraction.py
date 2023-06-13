@@ -22,23 +22,23 @@ from transformers import BeitImageProcessor, BeitFeatureExtractor
 
 parser = argparse.ArgumentParser(description='Feature extraction')
 
-parser.add_argument('--slide_path', help='path of slides to extract features from', default='C:/Users/Bened/Master_Thesis/one_test_image', type=str) 
-parser.add_argument('--save_path', help='path to save everything', default='C:/Users/Bened/Master_Thesis/results', type=str)               
-parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)                       
-parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['beit_fb', 'imagebind','dinov2_vits14', 'sam_vit_b'], type=str)   
+parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/ceph_vol/raw_data/2020', type=str)
+parser.add_argument('--save_path', help='path to save everything', default='/mnt/ceph_vol/features/2020/foundation', type=str)
+parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
+parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['imagebind','dinov2_vits14','sam_vit_b','beit_fb'], type=str)
 parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0], type=int)
 parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=True, type=bool)
-parser.add_argument('--patch_size', help='Patch size for saving', default=256, type=int)
+parser.add_argument('--patch_size', help='Patch size for saving', default=1024, type=int)
 parser.add_argument('--white_thresh', help='if all RGB pixel values are larger than this value, the pixel is considered as white/background', default=170, type=int)
 parser.add_argument('--black_thresh', help='if all RGB pixel values are smaller or equal than this value, the pixel is considered as black/background', default=0, type=str)
-parser.add_argument('--invalid_ratio_thresh', help='maximum acceptable amount of background', default=0.5, type=float)
-parser.add_argument('--edge_threshold', help='canny edge detection threshold. if smaller than this value, patch gets discarded', default=4, type=int)
+parser.add_argument('--invalid_ratio_thresh', help='maximum acceptable amount of background', default=0.3, type=float)
+parser.add_argument('--edge_threshold', help='canny edge detection threshold. if smaller than this value, patch gets discarded', default=2, type=int)
 parser.add_argument('--resolution_in_mpp', help='resolution in mpp, usually 10x= 1mpp, 20x=0.5mpp, 40x=0.25, ', default=0, type=float)
-parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float) # original: 1
+parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float)
 parser.add_argument('--save_tile_preview', help='set True if you want nice pictures', default=True, type=bool)
-parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)                                                         # original: 20000
-parser.add_argument('--exctraction_list', help='if only a subset of the slides should be extracted save their names in a csv', default="", type=str)
-parser.add_argument('--save_qupath_annotation', help='set True if you want nice qupath annotations', default=True, type=bool)
+parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)
+parser.add_argument('--exctraction_list', help='if only a subset of the slides should be extracted save their names in a csv', default=None, type=str)
+parser.add_argument('--save_qupath_annotation', help='set True if you want nice qupath annotations', default=False, type=bool)
 
 def main(args):
     """
@@ -77,7 +77,7 @@ def main(args):
         slide_files = [file for file in slide_files if file.stem in to_extract]
 
     #filter out slide files using RegEx
-    #slide_files = [file for file in slide_files if not re.search('_CR_|_CL_', str(file))]
+    slide_files = [file for file in slide_files if not re.search('_CR_|_CL_', str(file))]
     
     # Get model dictionaries
     model_dicts = get_models(args.models)

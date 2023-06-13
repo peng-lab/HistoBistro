@@ -17,9 +17,9 @@ RETCCL_PATH = '/home/ubuntu/run/retccl.pth'
 CTRANSPATH_PATH = '/mnt/volume/models/ctranspath.pth'
 KIMIANET_PATH = '/mnt/volume/models/KimiaNetPyTorchWeights.pth'
 SIMCLR_LUNG_PATH= '/mnt/volume/models/rushinssimclr.pth' 
-SAM_VIT_H_PATH='/mnt/volume/models/sam_vit_h_4b8939.pth'
-SAM_VIT_L_PATH="/mnt/volume/models/sam_vit_l_0b3195.pth"
-SAM_VIT_B_PATH="/mnt/volume/models/sam_vit_b_01ec64.pth"
+SAM_VIT_H_PATH='/mnt/ceph_vol/models/sam_vit_h_4b8939.pth'
+SAM_VIT_L_PATH="/mnt/ceph_vol/models/sam_vit_l_0b3195.pth"
+SAM_VIT_B_PATH="/mnt/ceph_vol/models/sam_vit_b_01ec64.pth"
 
 def get_models(modelnames):
     models = []
