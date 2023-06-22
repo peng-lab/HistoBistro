@@ -163,4 +163,4 @@ class ClassifierLightning(pl.LightningModule):
             data=[[patient[0], y.item(), preds.item(), logits.item(), (y==preds).int().item()]], 
             columns=['patient', 'ground_truth', 'predictions', 'logits', 'correct']
         )
-        self.outputs = pd.concat([self.outputs, outputs], ignore_index=True)from pathlib import Path
+        self.outputs = pd.concat([self.outputs, outputs], ignore_index=True)
