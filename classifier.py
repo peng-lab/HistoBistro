@@ -15,9 +15,7 @@ class ClassifierLightning(pl.LightningModule):
         self.config = config
         self.model = Transformer(num_classes=config.num_classes, input_dim=config.input_dim, pool='cls')
         self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight)
-        # TODO save config file correctly (with self.save_hyperparameters?)
-        self.save_hyperparameters()
-        
+
         self.lr = config.lr
         self.wd = config.wd
 
@@ -142,8 +140,9 @@ class ClassifierLightning(pl.LightningModule):
         logits = self.forward(x)
         loss = self.criterion(logits, y)
         probs = torch.sigmoid(logits)
-        preds = torch.round(probs)
+        preds = torch.argmax(probs, dim=1, keepdim=True)
         
+
         self.acc_test(preds, y)
         self.auroc_test(probs, y)
         self.f1_test(probs, y)
@@ -164,4 +163,4 @@ class ClassifierLightning(pl.LightningModule):
             data=[[patient[0], y.item(), preds.item(), logits.item(), (y==preds).int().item()]], 
             columns=['patient', 'ground_truth', 'predictions', 'logits', 'correct']
         )
-        self.outputs = pd.concat([self.outputs, outputs], ignore_index=True)
+        self.outputs = pd.concat([self.outputs, outputs], ignore_index=True)from pathlib import Path
