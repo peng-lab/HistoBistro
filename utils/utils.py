@@ -88,8 +88,8 @@ def threshold(patch, args):
     """
 
     # Count the number of whiteish pixels in the patch
-    whiteish_pixels = np.count_nonzero((patch[:, :, 0] > args.white_thresh) & (
-        patch[:, :, 1] > args.white_thresh) & (patch[:, :, 2] > args.white_thresh))
+    whiteish_pixels = np.count_nonzero((patch[:, :, 0] > args.white_thresh[0]) & (
+        patch[:, :, 1] > args.white_thresh[1]) & (patch[:, :, 2] > args.white_thresh[2]))
 
     # Count the number of black pixels in the patch
     black_pixels = np.count_nonzero((patch[:, :, 0] <= args.black_thresh) & (
@@ -145,8 +145,9 @@ def save_tile_preview(args, slide_name, scn, wsi, coords, tile_path):
         wsi[y:y+size, x2-thickness:x2, :] = color
         wsi[y2-thickness:y2, x:x+size, :] = color
   
-    for _, [_, x, y] in coords.iterrows():
-        draw_rect(wsi, y, x, args.patch_size)
+    for _, [scene, x, y] in coords.iterrows():
+        if scn==scene:
+            draw_rect(wsi, y, x, args.patch_size)
         #cv2.rectangle(wsi.copy(), (x1, y1), (x2, y2), (0,0,0), thickness=4)
 
     # Convert NumPy array to PIL Image object
@@ -255,5 +256,8 @@ def save_hdf5(args, slide_name, coords, feats,slide_sizes):
                 f['args'] = json.dumps(vars(args))
                 f['model_name'] = model_name
                 f['slide_sizes']=slide_sizes
+
+            if len(np.unique(coords.scn))!=len(slide_sizes):
+                print("SEMIWARNING, at least for one scene of ", slide_name, "no features were extracted, reason could be poor slide quality.")
         else:
             print("WARNING, no features extracted at slide", slide_name, "reason could be poor slide quality.")
