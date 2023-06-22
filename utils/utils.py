@@ -94,7 +94,12 @@ def threshold(patch, args):
     # Count the number of black pixels in the patch
     black_pixels = np.count_nonzero((patch[:, :, 0] <= args.black_thresh) & (
         patch[:, :, 1] <= args.black_thresh) & (patch[:, :, 2] <= args.black_thresh))
+    dark_pixels = np.count_nonzero((patch[:, :, 0] <= args.calc_thresh[0]) & (patch[:, :, 1] <= args.calc_thresh[1]) & (patch[:, :, 2] <= args.calc_thresh[2]))
+    calc_pixels=dark_pixels-black_pixels
 
+    if calc_pixels/(patch.shape[0] * patch.shape[1])>=0.05: #we always want to keep calc in!
+        return True
+    
     # Compute the ratio of foreground pixels to total pixels in the patch
     invalid_ratio = (whiteish_pixels + black_pixels) / \
         (patch.shape[0] * patch.shape[1])
