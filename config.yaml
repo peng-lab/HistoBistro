@@ -30,7 +30,7 @@ cohorts:
 ext_cohorts:
   desc: cohort used for external validation
   # value: ["MCO", "DACHS", "QUASAR", "RAINBOW", "TCGA", "Epi700"]
-  value: ["MCO", "DACHS", "QUASAR", "RAINBOW", "TCGA", "Epi700", "CPTAC", "DUSSEL", "MECC", "MUNICH", "YCR-BCIP-resections", "YCR-BCIP-biopsies", "FOXTROT", "MAINZ"]
+  value: ['CPTAC', 'DACHS', 'DUSSEL', 'Epi700', 'ERLANGEN', 'FOXTROT', 'MCO', 'MECC', 'MUNICH', 'QUASAR', 'RAINBOW', 'TCGA', 'TRANSCOT']
 clini_info:
   desc: dict with stats for clinical labels to include in training. not used if value = {} (empty dictionary)
   value: {}
@@ -107,3 +107,6 @@ resume:
 debug:
   desc: debug flag, turns off login etc.
   value: false
+num_samples:
+  desc: for experiment to analyze number of samples
+  value: null
