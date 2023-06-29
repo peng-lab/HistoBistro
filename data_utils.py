@@ -149,10 +149,10 @@ class MILDatasetIndices(Dataset):
             coords = torch.Tensor(np.array(h5_file['coords']))
         else:
             coords = 0  # NoneType is not accepted by dataloader
-            
+
         # avoid CUDA OOM
-        if features.shape[0] > 14000:
-            feat_idxs = torch.randperm(features.shape[0])[:14000]
+        if features.shape[0] > 10000:
+            feat_idxs = torch.randperm(features.shape[0])[:10000]
             features = features[feat_idxs]
 
         # randomly sample num_tiles tiles, if #tiles < num_tiles, fill vector with 0s 
@@ -254,8 +254,8 @@ class MILDataset(Dataset):
             features = features.squeeze(0)
             
         # avoid CUDA OOM
-        if features.shape[0] > 14000:
-            feat_idxs = torch.randperm(features.shape[0])[:14000]
+        if features.shape[0] > 10000:
+            feat_idxs = torch.randperm(features.shape[0])[:10000]
             features = features[feat_idxs]
         
         if 'coords' in h5_file.keys():
