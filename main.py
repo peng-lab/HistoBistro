@@ -1,6 +1,7 @@
 import argparse
 import os
 from pathlib import Path
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -18,6 +19,9 @@ from data_utils import MILDataset, MILDatasetIndices, get_multi_cohort_df
 from options import Options
 from utils import save_results
 
+
+# filter out UserWarnings from the torchmetrics package
+warnings.filterwarnings("ignore", category=UserWarning)
 
 def main(cfg):
     cfg.seed = torch.randint(0, 1000, (1, )).item() if cfg.seed is None else cfg.seed
@@ -121,7 +125,6 @@ def main(cfg):
             dataset=test_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
         )
 
-        # idx=2 since the ouput is feats, coords, labels
         num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
         cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
         cfg.criterion = "BCEWithLogitsLoss"
@@ -160,7 +163,7 @@ def main(cfg):
         )
 
         # --------------------------------------------------------
-        # set up and find best learning rate
+        # set up trainer
         # --------------------------------------------------------
         
         trainer = pl.Trainer(
@@ -183,7 +186,7 @@ def main(cfg):
         # training
         # --------------------------------------------------------
 
-        if Path(f'best_model_{cfg.logging_name}_fold{l}').exists():
+        if Path(model_path / f'best_model_{cfg.logging_name}_fold{l}.pth').exists():
             pass
         else: 
             results_val = trainer.fit(
@@ -224,6 +227,7 @@ def main(cfg):
         #         results.pop(test_cohort)
             
         wandb.finish()  # required for new wandb run in next fold
+        torch.cuda.empty_cache()
             
     # save results to csv file
     save_results(cfg, results, base_path, train_cohorts, test_cohorts)
