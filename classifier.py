@@ -7,13 +7,16 @@ from torch.nn import functional as F
 
 from utils import get_model, get_loss, get_optimizer, get_scheduler
 from models.aggregators.transformer import Transformer
+from models.aggregators.attentionmil import AttentionMIL
 
 
 class ClassifierLightning(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        # TODO use get_model function
         self.model = Transformer(num_classes=config.num_classes, input_dim=config.input_dim, pool='cls')
+        # self.model = AttentionMIL(config.input_dim, config.num_classes)
         self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight)
         # TODO save config file correctly (with self.save_hyperparameters?)
         self.save_hyperparameters()
