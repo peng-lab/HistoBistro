@@ -1,10 +1,11 @@
 import importlib
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-#from model.base_aggregator import BaseAggregator
+from models.aggregators.aggregator import BaseAggregator
 
 
 def get_loss(name, **kwargs):
@@ -80,7 +81,7 @@ def save_results(cfg, results, base_path, train_cohorts, test_cohorts):
     labels = [f'{l}_fold{k}' for l in labels_per_fold for k in range(len(results[test_cohorts[0]]))]
     labels = labels_mean_std + labels
     data = [[] for k in test_cohorts]
-    
+
     for idx_c, c in enumerate(test_cohorts):
         # calculate mean and std over folds
         folds = []
@@ -104,4 +105,8 @@ def save_results(cfg, results, base_path, train_cohorts, test_cohorts):
     # reorder columns and save to csv
     cols = results_df.columns.to_list()[num_cols:] + results_df.columns.to_list()[:num_cols]        
     results_df = results_df[cols]
+    # append to existing dataframe
+    if Path(base_path / f'results_{cfg.logging_name}.csv').is_file():
+        existing = pd.read_csv(base_path / f'results_{cfg.logging_name}.csv', sep=',')
+        results_df = pd.concat([existing, results_df], ignore_index=True)
     results_df.to_csv(base_path / f'results_{cfg.logging_name}.csv', sep=',', index=False)

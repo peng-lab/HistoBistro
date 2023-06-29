@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Tuple
 
 import h5py
 import numpy as np
@@ -19,9 +19,6 @@ def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
     # adapt dataframe to case sensitive clini tables
     df = df.rename({
         'MSI': 'isMSIH',
-        'BRAF': 'braf', 'BRAF_mutation': 'braf', 'braf_status': 'braf', 
-        'KRAS': 'kras', 'kras_status': 'kras', 'KRAS_mutation': 'kras',
-        'NRAS': 'nras', 'NRAS_mutation': 'nras',
         'Age': 'AGE'
     }, axis=1)
 
@@ -33,7 +30,7 @@ def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
     for target in target_labels:
         df = df[df[target].isin(categories)]
     # remove slides we don't have
-    h5s = set(feature_dir.glob('*.h5'))
+    h5s = set(feature_dir.glob('**/*.h5'))
     assert h5s, f'no features found in {feature_dir}!'
     h5_df = pd.DataFrame(h5s, columns=['slide_path'])
     # h5_df['FILENAME'] = h5_df.slide_path.map(lambda p: p.stem.split('.')[0])
@@ -47,7 +44,7 @@ def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
     return df
 
 
-def transform_clini_info(df: pd.DataFrame, label: str, mean: np.ndarray, std: np.ndarray) -> pd.DataFrame:
+def transform_clini_info(df: pd.DataFrame, label: str, mean: np.ndarray, std: np.ndarray) -> Tuple[pd.DataFrame, np.ndarray, np.ndarray]:
     """ transform columns with categorical features to integers and normalize them with given mean and std dev"""
     # fill missing columns with 0
     if label not in df.keys():
@@ -73,7 +70,7 @@ def transform_clini_info(df: pd.DataFrame, label: str, mean: np.ndarray, std: np
         # map columns to integers and non-valid labels to nan
         codes, uniques = pd.factorize(df[label], sort=True)
         if label in ['GENDER', 'LEFT_RIGHT']:
-            assert len(uniques) == 2, f'expected 2 categories for {label}, got {len(uniques)}'
+            assert len(uniques) == 2, f'expected 2 categories for {label}, got {len(uniques)} categories: {uniques}'
         codes = codes.astype(np.float32)
         codes[codes==-1.] = np.nan
         col = codes[~np.isnan(codes)]
@@ -153,6 +150,11 @@ class MILDatasetIndices(Dataset):
         else:
             coords = 0  # NoneType is not accepted by dataloader
 
+        # avoid CUDA OOM
+        if features.shape[0] > 10000:
+            feat_idxs = torch.randperm(features.shape[0])[:10000]
+            features = features[feat_idxs]
+
         # randomly sample num_tiles tiles, if #tiles < num_tiles, fill vector with 0s 
         tiles = torch.tensor([features.shape[0]])
         if self.num_tiles > 0:
@@ -226,7 +228,7 @@ class MILDataset(Dataset):
         self.data = pd.concat(df_list, ignore_index=True)
         if len(self.data.PATIENT) != sum(np_list):
             print(f'number of patients in joint dataset {len(self.data.PATIENT)} is not equal to the sum of each dataset {sum(np_list)}')
-            
+        
         if self.clini_info:
             for label in self.clini_info.keys():
                 self.data, mean, std = transform_clini_info(self.data, label, self.clini_info[label]['mean'], self.clini_info[label]['std'])
@@ -250,6 +252,11 @@ class MILDataset(Dataset):
             features = torch.Tensor(np.array(h5_file['feats']))
         if len(features.shape) == 3:
             features = features.squeeze(0)
+            
+        # avoid CUDA OOM
+        if features.shape[0] > 10000:
+            feat_idxs = torch.randperm(features.shape[0])[:10000]
+            features = features[feat_idxs]
         
         if 'coords' in h5_file.keys():
             coords = torch.Tensor(np.array(h5_file['coords']))
@@ -315,9 +322,6 @@ class MILDataset(Dataset):
         # TODO implement case insensitive keys
         df = df.rename({
             'MSI': 'isMSIH',
-            'BRAF': 'braf', 'BRAF_mutation': 'braf', 'braf_status': 'braf', 
-            'KRAS': 'kras', 'kras_status': 'kras', 'KRAS_mutation': 'kras',
-            'NRAS': 'nras', 'NRAS_mutation': 'nras',
             'Sex': 'GENDER',
             'Age': 'AGE',
             # 'Tumor Site'
@@ -325,13 +329,13 @@ class MILDataset(Dataset):
 
         # remove columns not in target_labels
         for key in df.columns:
-            if key not in target_labels + ['PATIENT', 'SLIDE', 'FILENAME', 'AGE', 'GENDER', 'LEFT_RIGHT']:
+            if key not in target_labels + ['PATIENT', 'SLIDE', 'FILENAME', *list(clini_info.keys())]:
                 df.drop(key, axis=1, inplace=True)
         # remove rows/slides with non-valid labels
         for target in target_labels:
             df = df[df[target].isin(categories)]
         # remove slides we don't have
-        h5s = set(feature_dir.glob('*.h5'))
+        h5s = set(feature_dir.glob('**/*.h5'))
         assert h5s, f'no features found in {feature_dir}!'
         h5_df = pd.DataFrame(h5s, columns=['slide_path'])
         # h5_df['FILENAME'] = h5_df.slide_path.map(lambda p: p.stem.split('.')[0])

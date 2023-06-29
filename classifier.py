@@ -7,18 +7,22 @@ from torch.nn import functional as F
 
 from utils import get_model, get_loss, get_optimizer, get_scheduler
 from models.aggregators.transformer import Transformer
+from models.aggregators.attentionmil import AttentionMIL
 
 
 class ClassifierLightning(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
+        # TODO use get_model function
         self.model = Transformer(num_classes=config.num_classes, input_dim=config.input_dim, pool='cls')
+        # self.model = AttentionMIL(config.input_dim, config.num_classes)
         self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight)
-
+        # TODO save config file correctly (with self.save_hyperparameters?)
+        self.save_hyperparameters()
+        
         self.lr = config.lr
         self.wd = config.wd
-        # self.num_steps = config.num_steps
 
         self.acc_train = torchmetrics.Accuracy(
             task=config.task, 
@@ -141,8 +145,9 @@ class ClassifierLightning(pl.LightningModule):
         logits = self.forward(x)
         loss = self.criterion(logits, y)
         probs = torch.sigmoid(logits)
-        preds = torch.argmax(probs, dim=1, keepdim=True)
+        preds = torch.round(probs)
         
+
         self.acc_test(preds, y)
         self.auroc_test(probs, y)
         self.f1_test(probs, y)

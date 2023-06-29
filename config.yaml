@@ -1,18 +1,18 @@
 # logging options
 save_dir:
   desc: path to save models, outputs, and folds
-  value: /home/ubuntu/logs
+  value: /path/to/your/logging/folder
 project:
   desc: wandb project name
   value: hackathon
 name:
   desc: costum prefix for logging
-  value: test
+  value: debug
 
 # task definition
 data_config:
   desc: config file for data paths
-  value: /home/ubuntu/projects/idkidc/data_config.yaml
+  value: data_config.yaml
 task:
   desc: training task in ['binary', 'multiclass', 'multilabel']
   value: binary
@@ -23,25 +23,16 @@ num_classes:
   desc: number of classes for training
   value: 1
 cohorts:
-  desc: cohort used for training
-  value: ["TCGA"]
+  desc: cohort used for training, in the shape ["cohort_name_1", "cohort_name_2"]
+  value: ["MCO"]
 ext_cohorts:
   desc: cohort used for external validation
-  value: ["CPTAC"]
+  value: ["ext_cohort1", "ext_cohort2"]
 clini_info:
-  desc: dict with stats for clinical labels to include in training. not used if value = empty dictionary
-  value:
-    AGE:
-      mean: null
-      std: null
-    GENDER:
-      mean: null
-      std: null
-    LEFT_RIGHT:
-      mean: null
-      std: null
+  desc: dict with stats for clinical labels to include in training. not used if value = {} (empty dictionary)
+  value: {}
 seed:
-  desc: random state for splitting the data
+  desc: random state, e.g., for splitting the data
   value: null
 
 # model options
@@ -71,9 +62,15 @@ folds:
 num_epochs:
   desc: number of epochs
   value: 1
+criterion: 
+  desc: loss function for model training
+  value: BCEWithLogitsLoss
 optimizer:
   desc: optimizer for model training
   value: AdamW
+criterion: 
+  desc: loss function for model training
+  value: BCEWithLogitsLoss
 scheduler:
   desc: scheduler for model training
   value: null
@@ -88,10 +85,16 @@ bs:
   value: 1
 stop_criterion:
   desc: metric for choosing best model
-  value: auc
+  value: loss
+val_check_interval:
+  desc: interval to evaluate on validation set
+  value: 500
 resume:
   desc: path to trained model for evaluation
   value: null
 debug:
   desc: debug flag, turns off login etc.
   value: false
+num_samples:
+  desc: for experiment to analyze number of samples
+  value: null
