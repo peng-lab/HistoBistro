@@ -5,7 +5,7 @@ import pandas as pd
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-#from model.base_aggregator import BaseAggregator
+from models.aggregators.aggregator import BaseAggregator
 
 
 def get_loss(name, **kwargs):

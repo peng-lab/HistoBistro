@@ -147,6 +147,7 @@ class ClassifierLightning(pl.LightningModule):
         probs = torch.sigmoid(logits)
         preds = torch.round(probs)
         
+
         self.acc_test(preds, y)
         self.auroc_test(probs, y)
         self.f1_test(probs, y)

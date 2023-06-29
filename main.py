@@ -254,4 +254,3 @@ if __name__ == '__main__':
     
     config = argparse.Namespace(**config)
     main(config)
-
