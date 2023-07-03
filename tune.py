@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 import wandb
 
 from options import Options
-from data_utils import MILDataset, MILDatasetIndices, get_multi_cohort_df
+from data_utils import MILDatasetIndices, get_multi_cohort_df
 from classifier import ClassifierLightning
 
 import optuna
@@ -76,8 +76,16 @@ data = get_multi_cohort_df(cfg.cohorts, [cfg.target], categories, norm=cfg.norm,
 
 test_ext_dataloader = []
 for ext in cfg.ext_cohorts:
-    dataset_ext = MILDataset(
-        [ext], [cfg.target], categories, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
+    test_data, clini_info = get_multi_cohort_df(
+        cfg.data_config, ext, [cfg.target], categories, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
+    )
+    dataset_ext = MILDatasetIndices(
+        test_data,
+        list(range(len(data))), [cfg.target],
+        categories,
+        norm=norm_test,
+        feats=cfg.feats,
+        clini_info=cfg.clini_info
     )
     test_ext_dataloader.append(
         DataLoader(
