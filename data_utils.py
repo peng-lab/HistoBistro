@@ -9,18 +9,41 @@ import yaml
 from torch.utils.data import Dataset
 
 
+"""
+dataset class (MILDataset) and helper functions (get_cohort_df, transform_clini_info, get_multi_cohort_df)
+"""
+
+
 def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
                     target_labels: Iterable[str], categories: Iterable[str], cohort: str, clini_info: dict = {}) -> pd.DataFrame:
+    """
+    Generate a cohort DataFrame based on clinical information and available slides.
+
+    Args:
+        clini_table (Path): Path to the clinical table file (CSV or Excel format).
+        slide_csv (Path): Path to the slide CSV file.
+        feature_dir (Path): Path to the directory containing slide feature files.
+        target_labels (Iterable[str]): List of target labels.
+        categories (Iterable[str]): List of valid label categories.
+        cohort (str): The cohort name (e.g., 'TCGA').
+        clini_info (dict, optional): Additional clinical information. Defaults to an empty dictionary.
+
+    Returns:
+        pd.DataFrame: The generated cohort DataFrame.
+
+    Raises:
+        AssertionError: If no slide features are found in the feature directory.
+    """
     
     clini_df = pd.read_csv(clini_table, dtype=str) if Path(clini_table).suffix == '.csv' else pd.read_excel(
         clini_table, dtype=str)
     slide_df = pd.read_csv(slide_csv, dtype=str)
     df = clini_df.merge(slide_df, on='PATIENT')
     # adapt dataframe to case sensitive clini tables
-    df = df.rename({
-        'MSI': 'isMSIH',
-        'Age': 'AGE'
-    }, axis=1)
+    # df = df.rename({
+    #     'MSI': 'isMSIH',
+    #     'Age': 'AGE'
+    # }, axis=1)
 
     # remove columns not in target_labels
     for key in df.columns:
@@ -29,11 +52,12 @@ def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
     # remove rows/slides with non-valid labels
     for target in target_labels:
         df = df[df[target].isin(categories)]
+        # TODO add usage of label_dict
+        # label = [label_dict[self.data[target][self.indices[item]]] for target in self.target_labels]
     # remove slides we don't have
     h5s = set(feature_dir.glob('**/*.h5'))
     assert h5s, f'no features found in {feature_dir}!'
     h5_df = pd.DataFrame(h5s, columns=['slide_path'])
-    # h5_df['FILENAME'] = h5_df.slide_path.map(lambda p: p.stem.split('.')[0])
     h5_df['FILENAME'] = h5_df.slide_path.map(lambda p: p.stem.split('_')[0].split('.')[0]) if cohort=='TCGA' else h5_df.slide_path.map(lambda p: p.stem)
     df = df.merge(h5_df, on='FILENAME')
     # reduce to one row per patient with list of slides in `df['slide_path']`
@@ -45,7 +69,23 @@ def get_cohort_df(clini_table: Path, slide_csv: Path, feature_dir: Path,
 
 
 def transform_clini_info(df: pd.DataFrame, label: str, mean: np.ndarray, std: np.ndarray) -> Tuple[pd.DataFrame, np.ndarray, np.ndarray]:
-    """ transform columns with categorical features to integers and normalize them with given mean and std dev"""
+    """ 
+    Transform columns with categorical features to integers and normalize them with given mean and std dev, fill missing values.
+
+    Args:
+        df (pd.DataFrame): The DataFrame containing clinical information.
+        label (str): The label/column name to transform.
+        mean (np.ndarray): The mean value used for normalization.
+        std (np.ndarray): The standard deviation used for normalization.
+
+    Returns:
+        Tuple[pd.DataFrame, np.ndarray, np.ndarray]: A tuple containing the transformed DataFrame,
+        the updated mean value, and the updated standard deviation.
+
+    Raises:
+        AssertionError: If the number of unique categories for 'GENDER' or 'LEFT_RIGHT' labels is not 2.
+
+    """
     # fill missing columns with 0
     if label not in df.keys():
         df[label] = 0
@@ -89,7 +129,25 @@ def transform_clini_info(df: pd.DataFrame, label: str, mean: np.ndarray, std: np
     return df, mean, std
 
 
-def get_multi_cohort_df(data_config: Path, cohorts: Iterable[str], target_labels: Iterable[str], categories: Iterable[str], norm: str = 'macenko', feats: str = 'ctranspath', aug: str = None, clini_info: dict = {}):
+def get_multi_cohort_df(data_config: Path, cohorts: Iterable[str], target_labels: Iterable[str], categories: Iterable[str], norm: str = 'macenko', feats: str = 'ctranspath', clini_info: dict = {}) -> Tuple[pd.DataFrame, dict]:
+    """
+    Generate a multi-cohort DataFrame concatenating the DataFrame from single cohorts.
+
+    Args:
+        data_config (Path): Path to the data configuration file.
+        cohorts (Iterable[str]): List of cohorts to include in the multi-cohort DataFrame.
+        target_labels (Iterable[str]): List of target labels.
+        categories (Iterable[str]): List of valid label categories.
+        norm (str, optional): Normalization method. Defaults to 'macenko'.
+        feats (str, optional): Feature extractor used. Defaults to 'ctranspath'.
+        clini_info (dict, optional): Additional clinical information used. Defaults to an empty dictionary.
+
+    Returns:
+        Tuple[pd.DataFrame, dict]: A tuple containing the multi-cohort DataFrame and the updated clinical information.
+
+    Raises:
+        AssertionError: If the number of patients in the joint dataset does not match the sum of each individual dataset.
+    """
     df_list = []
     np_list = []
     
@@ -149,11 +207,6 @@ class MILDatasetIndices(Dataset):
             coords = torch.Tensor(np.array(h5_file['coords']))
         else:
             coords = 0  # NoneType is not accepted by dataloader
-            
-        # avoid CUDA OOM
-        if features.shape[0] > 14000:
-            feat_idxs = torch.randperm(features.shape[0])[:14000]
-            features = features[feat_idxs]
 
         # avoid CUDA OOM
         if features.shape[0] > 10000:
@@ -207,149 +260,3 @@ class MILDatasetIndices(Dataset):
 
     def __len__(self):
         return len(self.data)
-
-
-class MILDataset(Dataset):
-    def __init__(self, data_config: Path, cohorts: Iterable[str], target_labels: Iterable[str], categories: Iterable[str], norm: str = 'macenko', feats: str = 'retccl',
-                 clini_info: dict = {}, num_tiles: int=-1):
-        self.cohorts = cohorts
-        self.clini_info = clini_info
-        self.norm = norm
-
-        df_list = []
-        np_list = []
-        with open(data_config, 'r') as f:
-            data_config = yaml.safe_load(f)
-            
-            for cohort in cohorts:
-                clini_table = Path(data_config[cohort]['clini_table'])
-                slide_csv = Path(data_config[cohort]['slide_csv'])
-                feature_dir = Path(data_config[cohort]['feature_dir'][norm][feats]) 
-
-                current_df = self.get_cohort_df(clini_table, slide_csv, feature_dir, target_labels, categories, cohort, clini_info)
-                df_list.append(current_df)
-                np_list.append(len(current_df.PATIENT))
-
-        self.data = pd.concat(df_list, ignore_index=True)
-        if len(self.data.PATIENT) != sum(np_list):
-            print(f'number of patients in joint dataset {len(self.data.PATIENT)} is not equal to the sum of each dataset {sum(np_list)}')
-        
-        if self.clini_info:
-            for label in self.clini_info.keys():
-                self.data, mean, std = transform_clini_info(self.data, label, self.clini_info[label]['mean'], self.clini_info[label]['std'])
-                self.clini_info[label]['mean'] = mean
-                self.clini_info[label]['std'] = std
-
-        self.target_labels = [target_labels] if type(target_labels) is str else target_labels
-        self.num_tiles = num_tiles
-
-    def __getitem__(self, item):
-        # load features and coords from .h5 file
-        h5_path = self.data.slide_path[item][0]
-        h5_file = h5py.File(h5_path)
-        if self.norm == 'histaugan' and torch.rand((1,)) < 0.5:
-            domain = torch.randint(7, (1,))
-            if 'feats_aug' in h5_file.keys():
-                features = torch.Tensor(np.array(h5_file['feats_aug']))[domain]
-            else:
-                features = torch.Tensor(np.array(h5_file['augmented']))[domain]
-        else: 
-            features = torch.Tensor(np.array(h5_file['feats']))
-        if len(features.shape) == 3:
-            features = features.squeeze(0)
-            
-        # avoid CUDA OOM
-        if features.shape[0] > 10000:
-            feat_idxs = torch.randperm(features.shape[0])[:10000]
-            features = features[feat_idxs]
-        
-        if 'coords' in h5_file.keys():
-            coords = torch.Tensor(np.array(h5_file['coords']))
-        else:
-            coords = 0  # NoneType is not accepted by dataloader
-
-        # randomly sample num_tiles tiles, if #tiles < num_tiles, fill vector with 0s 
-        tiles = torch.tensor([features.shape[0]])
-        if self.num_tiles > 0:
-            if features.shape[0] <= self.num_tiles:
-                pad = torch.zeros((self.num_tiles, features.shape[1]))
-                pad[:features.shape[0]] = features
-                features = pad
-                # also pad the coords vector, for stacking in dataloader
-                pad_coords = torch.zeros((self.num_tiles, 2))
-                pad_coords[:coords.shape[0]] = coords
-                coords = pad_coords
-            else: 
-                feat_idxs = torch.randperm(features.shape[0])[:self.num_tiles]
-                features = features[feat_idxs]
-                coords = coords[feat_idxs]
-        
-        label_dict = {
-            'Not mut.': 0,
-            'Mutat.': 1,
-            'nonMSIH': 0,
-            'MSIH': 1,
-            'WT': 0,
-            'MUT': 1,
-            'wt': 0,
-            'MT': 1,
-            'left': 1,
-            'right': 0,
-            'female': 1,
-            'male': 0,
-        }
-
-        # create binary or numeric labels from categorical labels
-        label = [label_dict[self.data[target][item]] for target in self.target_labels]
-        label = torch.Tensor(label)  # .squeeze(0)
-
-        # add clinical information to feature vector
-        if self.clini_info:
-            for info in self.clini_info.keys():
-                clini_info = torch.Tensor([self.data[info][item]]).unsqueeze(0).repeat_interleave(features.shape[0], dim=0)
-                features = torch.concat((features, clini_info), dim=1)
-
-        patient = self.data.PATIENT[item]
-
-        return features, coords, label, tiles, patient
-
-    def __len__(self):
-        return len(self.data)
-
-    def get_cohort_df(self,
-                      clini_table: Path, slide_csv: Path, feature_dir: Path,
-                      target_labels: Iterable[str], categories: Iterable[str], cohort: str, clini_info: dict = {}) -> pd.DataFrame:
-        clini_df = pd.read_csv(clini_table, dtype=str) if Path(clini_table).suffix == '.csv' else pd.read_excel(
-            clini_table, dtype=str)
-        slide_df = pd.read_csv(slide_csv, dtype=str)
-        df = clini_df.merge(slide_df, on='PATIENT')
-        # adapt dataframe to case sensitive clini tables
-        # TODO implement case insensitive keys
-        df = df.rename({
-            'MSI': 'isMSIH',
-            'Sex': 'GENDER',
-            'Age': 'AGE',
-            # 'Tumor Site'
-        }, axis=1)
-
-        # remove columns not in target_labels
-        for key in df.columns:
-            if key not in target_labels + ['PATIENT', 'SLIDE', 'FILENAME', *list(clini_info.keys())]:
-                df.drop(key, axis=1, inplace=True)
-        # remove rows/slides with non-valid labels
-        for target in target_labels:
-            df = df[df[target].isin(categories)]
-        # remove slides we don't have
-        h5s = set(feature_dir.glob('**/*.h5'))
-        assert h5s, f'no features found in {feature_dir}!'
-        h5_df = pd.DataFrame(h5s, columns=['slide_path'])
-        # h5_df['FILENAME'] = h5_df.slide_path.map(lambda p: p.stem.split('.')[0])
-        h5_df['FILENAME'] = h5_df.slide_path.map(lambda p: p.stem.split('.')[0]) if cohort=='TCGA' else h5_df.slide_path.map(lambda p: p.stem)
-        df = df.merge(h5_df, on='FILENAME')
-
-        # reduce to one row per patient with list of slides in `df['slide_path']`
-        patient_df = df.groupby('PATIENT').first().drop(columns='slide_path')
-        patient_slides = df.groupby('PATIENT').slide_path.apply(list)
-        df = patient_df.merge(patient_slides, left_on='PATIENT', right_index=True).reset_index()
-
-        return df

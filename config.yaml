@@ -46,6 +46,20 @@ clini_info:
 seed:
   desc: random state, e.g., for splitting the data
   value: null
+label_dict:
+  Not mut.: 0
+  Mutat.: 1
+  nonMSIH: 0
+  MSIH: 1
+  WT: 0
+  MUT: 1
+  wt: 0
+  MT: 1
+  left: 1
+  right: 0
+  female: 1
+  male: 0
+
 
 # model options
 model:
@@ -110,3 +124,4 @@ debug:
 num_samples:
   desc: for experiment to analyze number of samples
   value: null
+  

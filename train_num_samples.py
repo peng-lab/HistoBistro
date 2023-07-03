@@ -16,7 +16,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
 from classifier import ClassifierLightning
-from data_utils import MILDataset, MILDatasetIndices, get_multi_cohort_df
+from data_utils import MILDatasetIndices, get_multi_cohort_df
 from options import Options
 from utils import save_results
 
@@ -64,9 +64,12 @@ def main(cfg):
 
     test_ext_dataloader = []
     for ext in cfg.ext_cohorts:
-        dataset_ext = MILDataset(
-            cfg.data_config,
-            [ext], [cfg.target],
+        test_data, clini_info = get_multi_cohort_df(
+            cfg.data_config, ext, [cfg.target], categories, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
+        )
+        dataset_ext = MILDatasetIndices(
+            test_data,
+            list(range(len(data))), [cfg.target],
             categories,
             norm=norm_test,
             feats=cfg.feats,
