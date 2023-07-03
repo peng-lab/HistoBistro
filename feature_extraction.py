@@ -2,7 +2,7 @@ import argparse
 from pathlib import Path
 
 #import cv2
-import numpy as np
+from torch.utils.data import DataLoader
 import pandas as pd
 import slideio
 import torch
@@ -14,7 +14,7 @@ from models.model import get_models
 from utils.utils import (bgr_format, get_driver, get_scaling, 
                         save_hdf5, save_tile_preview, threshold,
                         save_qupath_annotation)
-
+from dataset import SlideDataset
 
 import concurrent.futures
 import time
@@ -37,7 +37,8 @@ parser.add_argument('--resolution_in_mpp', help='resolution in mpp, usually 10x=
 parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float)
 parser.add_argument('--save_tile_preview', help='set True if you want nice pictures', default=True, type=bool)
 parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)
-parser.add_argument('--exctraction_list', help='if only a subset of the slides should be extracted save their names in a csv', default=None, type=str) #'/home/ubuntu/idkidc/extraction_list.csv'
+parser.add_argument('--batch_size', default=16, type=int)
+parser.add_argument('--exctraction_list', help='if only a subset of the slides should be extracted save their names in a csv', default='/home/ubuntu/idkidc/extraction_list.csv', type=str) #
 parser.add_argument('--save_qupath_annotation', help='set True if you want nice qupath annotations', default=False, type=bool)
 parser.add_argument('--calc_thresh', help='darker colours than this are considered calc', default=[40,40,40], type=list)
 
@@ -131,6 +132,51 @@ def main(args):
 
     print("Time taken: ", elapsed_time, "seconds")
 
+
+def process_row(wsi, scn, x, args,slide_name):
+
+    patches_coords = pd.DataFrame()
+
+    for y in range(0, wsi.shape[1], args.patch_size):
+
+        #check if a full patch still 'fits' in y direction
+        if y+args.patch_size > wsi.shape[1]:
+            continue
+        
+        #extract patch
+        patch = wsi[x:x+args.patch_size, y:y+args.patch_size, :]
+
+        #threshold checks if it meets canny edge detection, white and black pixel criteria
+        if threshold(patch,args):
+            if args.save_patch_images:
+                im=Image.fromarray(patch)
+                im.save(Path(args.save_path) / 'patches' / slide_name/ f'{slide_name}_patch_{scn}_{x}_{y}.png')
+
+            patches_coords = pd.concat([patches_coords, pd.DataFrame({'scn': [scn], 'x': [x], 'y': [y]})], ignore_index=True)
+
+    return  patches_coords
+
+def patches_to_feature(wsi, coords, model_dicts, device):
+                feats = {model_dict["name"]: [] for model_dict in model_dicts}
+
+                with torch.no_grad():
+
+                    for model_dict in model_dicts:
+
+                        model=model_dict['model']
+                        transform=model_dict['transforms']
+                        model_name=model_dict['name']
+
+                        dataset= SlideDataset(wsi,coords,args.patch_size,transform)
+                        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
+
+                        for batch in dataloader:
+                            features= model(batch.to(device))
+                            feats[model_name]=feats[model_name]+(features.cpu().numpy().tolist())
+
+                return feats
+
+
 def extract_features(slide, slide_name, model_dicts,device,args,tile_path, annotation_path): 
     """
     Extract features from a slide using a given model.
@@ -166,7 +212,7 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path, annot
         wsi=scene.read_block(size=(int(scene.size[0]//scaling), int(scene.size[1]//scaling)))
 
         #revert the flipping
-        wsi=np.transpose(wsi, (1, 0, 2))
+        #wsi=np.transpose(wsi, (1, 0, 2))
         
         #check if RGB or BGR is used and adapt
         if bgr_format(slide.raw_metadata):
@@ -177,78 +223,21 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path, annot
         with concurrent.futures.ThreadPoolExecutor() as executor:
             futures = []
 
-            def process_row(wsi, scn, x, args):
-
-                patches = []
-                patches_coords = pd.DataFrame()
-
-                for y in range(0, wsi.shape[1], args.patch_size):
-
-                    #check if a full patch still 'fits' in y direction
-                    if y+args.patch_size > wsi.shape[1]:
-                        continue
-                    
-                    #extract patch
-                    patch = wsi[x:x+args.patch_size, y:y+args.patch_size, :]
-
-                    #threshold checks if it meets canny edge detection, white and black pixel criteria
-                    if threshold(patch,args):
-                        # Extract patch
-                        patches.append(patch)
-                        patches_coords = pd.concat([patches_coords, pd.DataFrame({'scn': [scn], 'x': [x], 'y': [y]})], ignore_index=True)
-                
-                return patches, patches_coords
-
-            def patches_to_feature(patches, coords, model_dicts):
-                feats = {model_dict["name"]: [] for model_dict in model_dicts}
-
-                for patch, (_, (_, x, y)) in zip(patches, coords.iterrows()):
-                    im = Image.fromarray(patch)
-
-                    if args.save_patch_images:
-                        im.save(Path(args.save_path) / 'patches' / slide_name/ f'{slide_name}_patch_{scn}_{x}_{y}.png')
-
-                    #model inference on single patches
-                    with torch.no_grad():
-                        for model_dict in model_dicts:
-                            model=model_dict['model']
-                            transform=model_dict['transforms']
-                            model_name=model_dict['name']
-                            if model_name == 'beit_microsoft':
-                                processor = BeitImageProcessor.from_pretrained('microsoft/beit-base-patch16-224-pt22k-ft22k')
-                                inputs = processor(images=im, return_tensors="pt")
-                                outputs = model(**inputs)
-                                features = outputs.logits
-                            elif model_name == 'beit_fb':
-                                feature_extractor = BeitFeatureExtractor.from_pretrained('facebook/data2vec-vision-base-ft1k')
-                                inputs = feature_extractor(images=im, return_tensors="pt")
-                                outputs = model(**inputs)
-                                features = outputs.logits
-                            else:
-                                img_t = transform(im)
-                                batch_t = img_t.unsqueeze(0).to(device)
-                                features = model(batch_t)
-                            feats[model_name].append(features)
-
-                return feats
-                    
             #iterate over x (width) of scene
             for x in tqdm(range(0, wsi.shape[0], args.patch_size),position=1,leave=False,desc=slide_name+"_"+str(scn)):
-
                 #check if a full patch still 'fits' in x direction
                 if x+args.patch_size > wsi.shape[0]:
                     continue
-            
-                future = executor.submit(process_row, wsi, scn, x, args)
+                future = executor.submit(process_row, wsi, scn, x, args,slide_name)
                 futures.append(future)
 
             for future in concurrent.futures.as_completed(futures):
-                patches, patches_coords = future.result()
+                patches_coords = future.result()
                 if len(patches_coords) > 0:
                     coords = pd.concat([coords, patches_coords], ignore_index=True)
-                    patch_feats = patches_to_feature(patches, patches_coords, model_dicts)
-                    for key in patch_feats.keys():
-                        feats[key].extend(patch_feats[key])
+        patch_feats = patches_to_feature(wsi, coords, model_dicts, device)
+        for key in patch_feats.keys():
+            feats[key].extend(patch_feats[key])
            
         #saves tiling preview on slide in desired size
         if args.save_tile_preview:
