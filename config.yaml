@@ -1,7 +1,8 @@
 # logging options
 save_dir:
   desc: path to save models, outputs, and folds
-  value: /path/to/your/logging/folder
+  # value: /home/ubuntu/logs
+  value: /lustre/groups/peng/workspace/sophia.wagner/logs/idkidc
 project:
   desc: wandb project name
   value: hackathon
@@ -12,7 +13,8 @@ name:
 # task definition
 data_config:
   desc: config file for data paths
-  value: data_config.yaml
+  # value: /home/ubuntu/projects/idkidc/data_config.yaml
+  value: /home/haicu/sophia.wagner/projects/idkidc/data_config.yaml
 task:
   desc: training task in ['binary', 'multiclass', 'multilabel']
   value: binary
@@ -27,10 +29,20 @@ cohorts:
   value: ["MCO"]
 ext_cohorts:
   desc: cohort used for external validation
-  value: ["ext_cohort1", "ext_cohort2"]
+  # value: ["MCO", "DACHS", "QUASAR", "RAINBOW", "TCGA", "Epi700"]
+  value: ["MCO", "DACHS", "QUASAR", "RAINBOW", "TCGA", "Epi700", "CPTAC", "DUSSEL", "MECC", "MUNICH", "YCR-BCIP-resections", "YCR-BCIP-biopsies", "FOXTROT", "MAINZ"]
 clini_info:
   desc: dict with stats for clinical labels to include in training. not used if value = {} (empty dictionary)
   value: {}
+    # AGE:
+    #   mean: null
+    #   std: null
+    # GENDER:
+    #   mean: null
+    #   std: null
+    # LEFT_RIGHT:
+    #   mean: null
+    #   std: null
 seed:
   desc: random state, e.g., for splitting the data
   value: null
@@ -98,3 +110,4 @@ debug:
 num_samples:
   desc: for experiment to analyze number of samples
   value: null
+  
