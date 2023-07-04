@@ -23,7 +23,7 @@ from transformers import BeitImageProcessor, BeitFeatureExtractor
 parser = argparse.ArgumentParser(description='Feature extraction')
 
 parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/ceph_vol/raw_data/2020', type=str)
-parser.add_argument('--save_path', help='path to save everything', default='/mnt/ceph_vol/features/2020/foundation', type=str)
+parser.add_argument('--save_path', help='path to save everything', default='/mnt/ceph_vol/features/2020/debug1', type=str)
 parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
 parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['resnet50'], type=str)
 parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0], type=int)
@@ -41,6 +41,7 @@ parser.add_argument('--batch_size', default=16, type=int)
 parser.add_argument('--exctraction_list', help='if only a subset of the slides should be extracted save their names in a csv', default='/home/ubuntu/idkidc/extraction_list.csv', type=str) #
 parser.add_argument('--save_qupath_annotation', help='set True if you want nice qupath annotations', default=False, type=bool)
 parser.add_argument('--calc_thresh', help='darker colours than this are considered calc', default=[40,40,40], type=list)
+
 
 def main(args):
     """
@@ -156,25 +157,28 @@ def process_row(wsi, scn, x, args,slide_name):
 
     return  patches_coords
 
+
+
 def patches_to_feature(wsi, coords, model_dicts, device):
-                feats = {model_dict["name"]: [] for model_dict in model_dicts}
 
-                with torch.no_grad():
+    feats = {model_dict["name"]: [] for model_dict in model_dicts}
 
-                    for model_dict in model_dicts:
+    with torch.no_grad():
 
-                        model=model_dict['model']
-                        transform=model_dict['transforms']
-                        model_name=model_dict['name']
+        for model_dict in model_dicts:
 
-                        dataset= SlideDataset(wsi,coords,args.patch_size,transform)
-                        dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
+            model=model_dict['model']
+            transform=model_dict['transforms']
+            model_name=model_dict['name']
 
-                        for batch in dataloader:
-                            features= model(batch.to(device))
-                            feats[model_name]=feats[model_name]+(features.cpu().numpy().tolist())
+            dataset= SlideDataset(wsi,coords,args.patch_size,transform)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
 
-                return feats
+            for batch in dataloader:
+                features= model(batch.to(device))
+                feats[model_name]=feats[model_name]+(features.cpu().numpy().tolist())
+
+    return feats
 
 
 def extract_features(slide, slide_name, model_dicts,device,args,tile_path, annotation_path): 
@@ -204,6 +208,7 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path, annot
     orig_sizes=[]
     #iterate over scenes of the slides
     for scn in range(slide.num_scenes):
+        scene_coords = pd.DataFrame({'scn' : [], 'x' : [], 'y' : []}, dtype=int) 
         scene=slide.get_scene(scn)
         orig_sizes.append(scene.size)   
         scaling=get_scaling(args,scene.resolution[0])
@@ -234,8 +239,10 @@ def extract_features(slide, slide_name, model_dicts,device,args,tile_path, annot
             for future in concurrent.futures.as_completed(futures):
                 patches_coords = future.result()
                 if len(patches_coords) > 0:
-                    coords = pd.concat([coords, patches_coords], ignore_index=True)
-        patch_feats = patches_to_feature(wsi, coords, model_dicts, device)
+                    scene_coords = pd.concat([scene_coords, patches_coords], ignore_index=True)
+        patch_feats = patches_to_feature(wsi, scene_coords, model_dicts, device)
+        coords = pd.concat([coords, scene_coords], ignore_index=True)
+
         for key in patch_feats.keys():
             feats[key].extend(patch_feats[key])
            
