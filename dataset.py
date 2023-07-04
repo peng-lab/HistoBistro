@@ -15,9 +15,9 @@ class SlideDataset(Dataset):
         return len(self.coordinates)
 
     def __getitem__(self, idx):
-        print(idx)
-        x=self.coordinates.iloc[idx]['x']
-        y=self.coordinates.iloc[idx]['y']
+        entry=self.coordinates.iloc[idx]
+        x=entry['x']
+        y=entry['y']
 
         patch = self.slide[x:x+self.patch_size, y:y+self.patch_size, :]
         img = Image.fromarray(patch)  # Convert image to RGB
