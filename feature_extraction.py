@@ -27,17 +27,17 @@ parser.add_argument('--save_path', help='path to save everything', default='/mnt
 parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
 parser.add_argument('--models', help='select model ctranspath, retccl, all', nargs='+', default=['resnet50'], type=str)
 parser.add_argument('--scene_list', help='list of scene(s) to be extracted', nargs='+', default=[0], type=int)
-parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=False, type=bool)
 parser.add_argument('--patch_size', help='Patch size for saving', default=256, type=int)
 parser.add_argument('--white_thresh', help='if all RGB pixel values are larger than this value, the pixel is considered as white/background', default=[170,185,175], type=list)
 parser.add_argument('--black_thresh', help='if all RGB pixel values are smaller or equal than this value, the pixel is considered as black/background', default=0, type=str)
 parser.add_argument('--invalid_ratio_thresh', help='maximum acceptable amount of background', default=0.3, type=float)
 parser.add_argument('--edge_threshold', help='canny edge detection threshold. if smaller than this value, patch gets discarded', default=2, type=int)
 parser.add_argument('--resolution_in_mpp', help='resolution in mpp, usually 10x= 1mpp, 20x=0.5mpp, 40x=0.25, ', default=0, type=float)
-parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float)
+parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=1, type=float)
 parser.add_argument('--save_tile_preview', help='set True if you want nice pictures', default=True, type=bool)
+parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=False, type=bool)
 parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)
-parser.add_argument('--batch_size', default=16, type=int)
+parser.add_argument('--batch_size', default=32, type=int)
 parser.add_argument('--exctraction_list', help='if only a subset of the slides should be extracted save their names in a csv', default='/home/ubuntu/idkidc/extraction_list.csv', type=str) #
 parser.add_argument('--save_qupath_annotation', help='set True if you want nice qupath annotations', default=False, type=bool)
 parser.add_argument('--calc_thresh', help='darker colours than this are considered calc', default=[40,40,40], type=list)
@@ -172,7 +172,7 @@ def patches_to_feature(wsi, coords, model_dicts, device):
             model_name=model_dict['name']
 
             dataset= SlideDataset(wsi,coords,args.patch_size,transform)
-            dataloader = DataLoader(dataset, batch_size=args.batch_size, shuffle=False)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=4, shuffle=False)
 
             for batch in dataloader:
                 features= model(batch.to(device))
