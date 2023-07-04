@@ -1,3 +1,4 @@
+import argparse
 import json
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -5,11 +6,11 @@ from pathlib import Path
 import cv2
 import h5py
 import numpy as np
-import torch
-
 from PIL import Image
+import pandas as pd
 
-def bgr_format(xml_string):
+
+def bgr_format(xml_string: str):
     """
     Determine whether the image is in BGR or RGB format based on the PixelType element in the image metadata.
 
@@ -19,15 +20,19 @@ def bgr_format(xml_string):
     Returns:
     - A boolean value indicating whether the image is in BGR format (True) or not (False).
     """
-    if xml_string == '':
+    if xml_string == "":
         return False
-    
+
     root = ET.fromstring(xml_string)
     pixel_type_elem = root.findall(".//PixelType")
-    return 'bgr' in pixel_type_elem[0].text.lower() if pixel_type_elem is not None else False
+    return (
+        "bgr" in pixel_type_elem[0].text.lower()
+        if pixel_type_elem is not None
+        else False
+    )
 
 
-def get_driver(extension_name):
+def get_driver(extension_name: str):
     """
     Determine the driver to use for opening an image file based on its extension.
 
@@ -38,15 +43,15 @@ def get_driver(extension_name):
     - A string representing the driver to use for opening the image file.
     """
 
-    if extension_name in ['.tiff', '.tif', '.jpg', '.jpeg', '.png']:
-        return 'GDAL'
-    elif extension_name == '':
-        return 'DCM'
+    if extension_name in [".tiff", ".tif", ".jpg", ".jpeg", ".png"]:
+        return "GDAL"
+    elif extension_name == "":
+        return "DCM"
     else:
-        return extension_name.replace('.', '').upper()
+        return extension_name.replace(".", "").upper()
 
 
-def get_scaling(args, mpp_resolution_slide):
+def get_scaling(args: argparse.Namespace, mpp_resolution_slide: float):
     """
     Determine the scaling factor to apply to an image based on the desired resolution in micrometers per pixel and the
     resolution in micrometers per pixel of the slide.
@@ -64,10 +69,10 @@ def get_scaling(args, mpp_resolution_slide):
     if args.downscaling_factor > 0:
         return args.downscaling_factor
     else:
-        return args.resolution_in_mpp/(mpp_resolution_slide*1e06)
+        return args.resolution_in_mpp / (mpp_resolution_slide * 1e06)
 
 
-def threshold(patch, args):
+def threshold(patch: np.array, args: argparse.Namespace):
     """
     Determine if a patch of an image should be considered invalid based on the following criteria:
     - The number of pixels with color values above a white threshold and below a black threshold should not exceed
@@ -88,25 +93,35 @@ def threshold(patch, args):
     """
 
     # Count the number of whiteish pixels in the patch
-    whiteish_pixels = np.count_nonzero((patch[:, :, 0] > args.white_thresh[0]) & (
-        patch[:, :, 1] > args.white_thresh[1]) & (patch[:, :, 2] > args.white_thresh[2]))
+    whiteish_pixels = np.count_nonzero(
+        (patch[:, :, 0] > args.white_thresh[0])
+        & (patch[:, :, 1] > args.white_thresh[1])
+        & (patch[:, :, 2] > args.white_thresh[2])
+    )
 
     # Count the number of black pixels in the patch
-    black_pixels = np.count_nonzero((patch[:, :, 0] <= args.black_thresh) & (
-        patch[:, :, 1] <= args.black_thresh) & (patch[:, :, 2] <= args.black_thresh))
-    dark_pixels = np.count_nonzero((patch[:, :, 0] <= args.calc_thresh[0]) & (patch[:, :, 1] <= args.calc_thresh[1]) & (patch[:, :, 2] <= args.calc_thresh[2]))
-    calc_pixels=dark_pixels-black_pixels
+    black_pixels = np.count_nonzero(
+        (patch[:, :, 0] <= args.black_thresh)
+        & (patch[:, :, 1] <= args.black_thresh)
+        & (patch[:, :, 2] <= args.black_thresh)
+    )
+    dark_pixels = np.count_nonzero(
+        (patch[:, :, 0] <= args.calc_thresh[0])
+        & (patch[:, :, 1] <= args.calc_thresh[1])
+        & (patch[:, :, 2] <= args.calc_thresh[2])
+    )
+    calc_pixels = dark_pixels - black_pixels
 
-    if calc_pixels/(patch.shape[0] * patch.shape[1])>=0.05: #we always want to keep calc in!
+    if (
+        calc_pixels / (patch.shape[0] * patch.shape[1]) >= 0.05
+    ):  # we always want to keep calc in!
         return True
-    
+
     # Compute the ratio of foreground pixels to total pixels in the patch
-    invalid_ratio = (whiteish_pixels + black_pixels) / \
-        (patch.shape[0] * patch.shape[1])
+    invalid_ratio = (whiteish_pixels + black_pixels) / (patch.shape[0] * patch.shape[1])
 
     # Check if the ratio exceeds the threshold for invalid patches
     if invalid_ratio <= args.invalid_ratio_thresh:
-
         # Compute the edge map of the patch using Canny edge detection
         edge = cv2.Canny(patch, 40, 100)
 
@@ -145,15 +160,15 @@ def save_tile_preview(args, slide_name, scn, wsi, coords, tile_path):
     # Draw bounding boxes for each tile on the whole slide image
     def draw_rect(wsi, x, y, size, color=[0, 0, 0], thickness=4):
         x2, y2 = x + size, y + size
-        wsi[y:y+thickness, x:x+size, :] = color
-        wsi[y:y+size, x:x+thickness, :] = color
-        wsi[y:y+size, x2-thickness:x2, :] = color
-        wsi[y2-thickness:y2, x:x+size, :] = color
-  
+        wsi[y : y + thickness, x : x + size, :] = color
+        wsi[y : y + size, x : x + thickness, :] = color
+        wsi[y : y + size, x2 - thickness : x2, :] = color
+        wsi[y2 - thickness : y2, x : x + size, :] = color
+
     for _, [scene, x, y] in coords.iterrows():
-        if scn==scene:
+        if scn == scene:
             draw_rect(wsi, y, x, args.patch_size)
-        #cv2.rectangle(wsi.copy(), (x1, y1), (x2, y2), (0,0,0), thickness=4)
+        # cv2.rectangle(wsi.copy(), (x1, y1), (x2, y2), (0,0,0), thickness=4)
 
     # Convert NumPy array to PIL Image object
     preview_im = Image.fromarray(wsi)
@@ -174,9 +189,10 @@ def save_tile_preview(args, slide_name, scn, wsi, coords, tile_path):
     preview_im = preview_im.resize((new_width, new_height))
 
     # Save the preview image to disk
-    preview_im.save(tile_path / f'{slide_name}_{scn}.png')
+    preview_im.save(tile_path / f"{slide_name}_{scn}.png")
 
-def save_qupath_annotation(args, slide_name, scn, coords, annotation_path):
+
+def save_qupath_annotation(args: argparse.Namespace, slide_name:str, scn:int, coords:pd.DataFrame, annotation_path:str):
     """
     Saves the QuPath annotation to a geojson file.
 
@@ -190,59 +206,52 @@ def save_qupath_annotation(args, slide_name, scn, coords, annotation_path):
     Returns:
         None
     """
-    
+
     # Function to create a single annotation feature
-    def create_feature(coordinates, color):
-        
+    def create_feature(coordinates, color:str):
         # Define the coordinates of the feature polygon
-        x , y = coordinates[0], coordinates[1]
+        x, y = coordinates[0], coordinates[1]
         top_left = coordinates
         top_right = [coordinates[0] + args.patch_size, coordinates[1]]
-        bottom_right = [coordinates[0] + args.patch_size, coordinates[1] + args.patch_size]
+        bottom_right = [
+            coordinates[0] + args.patch_size,
+            coordinates[1] + args.patch_size,
+        ]
         bottom_left = [coordinates[0], coordinates[1] + args.patch_size]
         coordinates = [top_left, top_right, bottom_right, bottom_left, top_left]
 
         # Create the feature dictionary with the specified properties
         feature = {
             "type": "Feature",
-            "geometry": {
-                "type": "Polygon",
-                "coordinates": [coordinates]
-            },
+            "geometry": {"type": "Polygon", "coordinates": [coordinates]},
             "properties": {
                 "objectType": "annotation",
-                "classification": {
-                    "name": f'{x}, {y}', # random name
-                    "color": color
-                }
-            }
+                "classification": {"name": f"{x}, {y}", "color": color},  # random name
+            },
         }
         return feature
 
     # Function to create a feature collection from a list of features
     def create_feature_collection(features):
-        feature_collection = {
-            "type": "FeatureCollection",
-            "features": features
-        }
+        feature_collection = {"type": "FeatureCollection", "features": features}
         return feature_collection
-    
+
     # Define the color of the annotation features
     color = [255, 0, 0]
-    
+
     # Create a list of annotation features from the provided coordinates
     features = [create_feature([x, y], color) for _, [_, x, y] in coords.iterrows()]
-    
+
     # Convert the list of features into a feature collection
     features = create_feature_collection(features)
-    
+
     # Write the feature collection to a GeoJSON file
-    with open(annotation_path / f'{slide_name}_{scn}.geojson', 'w') as annotation_file:
+    with open(annotation_path / f"{slide_name}_{scn}.geojson", "w") as annotation_file:
         # Write the dictionary to the file in JSON format
         json.dump(features, annotation_file)
 
 
-def save_hdf5(args, slide_name, coords, feats,slide_sizes):
+def save_hdf5(args: argparse.Namespace, slide_name:str , coords: pd.DataFrame, feats:dict, slide_sizes:list[tuple]):
     """
     Save the extracted features and coordinates to an HDF5 file.
     Args:
@@ -254,15 +263,29 @@ def save_hdf5(args, slide_name, coords, feats,slide_sizes):
         None
     """
     for model_name, features in feats.items():
-        if len(features)>0:
-            with h5py.File(Path(args.save_path) / 'h5_files' / f'{args.patch_size}px_{model_name}_{args.resolution_in_mpp}mpp_{args.downscaling_factor}xdown_normal' / f'{slide_name}.h5', 'w') as f:
-                f['coords'] = coords.astype('float64')
-                f['feats'] = features
-                f['args'] = json.dumps(vars(args))
-                f['model_name'] = model_name
-                f['slide_sizes']=slide_sizes
+        if len(features) > 0:
+            with h5py.File(
+                Path(args.save_path)
+                / "h5_files"
+                / f"{args.patch_size}px_{model_name}_{args.resolution_in_mpp}mpp_{args.downscaling_factor}xdown_normal"
+                / f"{slide_name}.h5",
+                "w",
+            ) as f:
+                f["coords"] = coords.astype("float64")
+                f["feats"] = features
+                f["args"] = json.dumps(vars(args))
+                f["model_name"] = model_name
+                f["slide_sizes"] = slide_sizes
 
-            if len(np.unique(coords.scn))!=len(slide_sizes):
-                print("SEMIWARNING, at least for one scene of ", slide_name, "no features were extracted, reason could be poor slide quality.")
+            if len(np.unique(coords.scn)) != len(slide_sizes):
+                print(
+                    "SEMIWARNING, at least for one scene of ",
+                    slide_name,
+                    "no features were extracted, reason could be poor slide quality.",
+                )
         else:
-            print("WARNING, no features extracted at slide", slide_name, "reason could be poor slide quality.")
+            print(
+                "WARNING, no features extracted at slide",
+                slide_name,
+                "reason could be poor slide quality.",
+            )
