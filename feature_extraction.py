@@ -22,6 +22,10 @@ from transformers import BeitImageProcessor, BeitFeatureExtractor
 
 parser = argparse.ArgumentParser(description='Feature extraction')
 
+#20-041_K6_vK
+#20-069_K3_vK
+#20-009_K6_vK
+
 parser.add_argument('--slide_path', help='path of slides to extract features from', default='/mnt/ceph_vol/raw_data/2020', type=str)
 parser.add_argument('--save_path', help='path to save everything', default='/mnt/ceph_vol/features/2020/debug1', type=str)
 parser.add_argument('--file_extension', help='file extension the slides are saved under, e.g. tiff', default='.czi', type=str)
@@ -33,7 +37,7 @@ parser.add_argument('--black_thresh', help='if all RGB pixel values are smaller 
 parser.add_argument('--invalid_ratio_thresh', help='maximum acceptable amount of background', default=0.3, type=float)
 parser.add_argument('--edge_threshold', help='canny edge detection threshold. if smaller than this value, patch gets discarded', default=2, type=int)
 parser.add_argument('--resolution_in_mpp', help='resolution in mpp, usually 10x= 1mpp, 20x=0.5mpp, 40x=0.25, ', default=0, type=float)
-parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=1, type=float)
+parser.add_argument('--downscaling_factor', help='only used if >0, overrides manual resolution. needed if resolution not given', default=8, type=float)
 parser.add_argument('--save_tile_preview', help='set True if you want nice pictures', default=True, type=bool)
 parser.add_argument('--save_patch_images', help='True if each patch should be saved as an image', default=False, type=bool)
 parser.add_argument('--preview_size', help='size of tile_preview', default=4096, type=int)
@@ -172,7 +176,7 @@ def patches_to_feature(wsi, coords, model_dicts, device):
             model_name=model_dict['name']
 
             dataset= SlideDataset(wsi,coords,args.patch_size,transform)
-            dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=4, shuffle=False)
+            dataloader = DataLoader(dataset, batch_size=args.batch_size, num_workers=1, shuffle=False)
 
             for batch in dataloader:
                 features= model(batch.to(device))
