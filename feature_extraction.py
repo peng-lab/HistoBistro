@@ -164,7 +164,7 @@ def main(args):
 
     if bool(args.exctraction_list) is not False:
         to_extract = pd.read_csv(args.exctraction_list).iloc[:, 0].tolist()
-        slide_files = [file for file in slide_files if file.stem in to_extract]
+        slide_files = [file for file in slide_files if file.name in to_extract]
 
     # filter out slide files using RegEx
     slide_files = [
