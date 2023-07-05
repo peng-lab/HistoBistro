@@ -12,7 +12,7 @@ from PIL import Image
 # import cv2
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import BeitFeatureExtractor, BeitImageProcessor
+#from transformers import BeitFeatureExtractor, BeitImageProcessor
 
 from dataset import SlideDataset
 from models.model import get_models
@@ -28,13 +28,13 @@ parser = argparse.ArgumentParser(description="Feature extraction")
 parser.add_argument(
     "--slide_path",
     help="path of slides to extract features from",
-    default="/mnt/ceph_vol/raw_data/2020",
+    default="/mnt/ceph_vol/raw_data/2019",
     type=str,
 )
 parser.add_argument(
     "--save_path",
     help="path to save everything",
-    default="/mnt/ceph_vol/features/2020/debug1",
+    default="/mnt/ceph_vol/features/2019/",
     type=str,
 )
 parser.add_argument(
@@ -47,7 +47,7 @@ parser.add_argument(
     "--models",
     help="select model ctranspath, retccl, all",
     nargs="+",
-    default=["resnet50"],
+    default=["ctranspath"],
     type=str,
 )
 parser.add_argument(
@@ -91,7 +91,7 @@ parser.add_argument(
 parser.add_argument(
     "--downscaling_factor",
     help="only used if >0, overrides manual resolution. needed if resolution not given",
-    default=16,
+    default=8,
     type=float,
 )
 parser.add_argument(
@@ -113,7 +113,7 @@ parser.add_argument("--batch_size", default=32, type=int)
 parser.add_argument(
     "--exctraction_list",
     help="if only a subset of the slides should be extracted save their names in a csv",
-    default="/home/ubuntu/idkidc/extraction_list.csv",
+    default=None, #"/home/ubuntu/idkidc/extraction_list.csv"
     type=str,
 )  #
 parser.add_argument(
