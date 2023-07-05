@@ -14,7 +14,7 @@ from transformers import BeitForImageClassification, Data2VecVisionForImageClass
 # RetCCL can be downloaded here: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL?usp=sharing
 # kimianet download: https://kimialab.uwaterloo.ca/kimia/?smd_process_download=1&download_id=4216
 RETCCL_PATH = '/home/ubuntu/run/retccl.pth'
-CTRANSPATH_PATH = '/mnt/volume/models/ctranspath.pth'
+CTRANSPATH_PATH = '/mnt/ceph_vol/models/ctranspath.pth'
 KIMIANET_PATH = '/mnt/volume/models/KimiaNetPyTorchWeights.pth'
 SIMCLR_LUNG_PATH= '/mnt/volume/models/rushinssimclr.pth' 
 SAM_VIT_H_PATH='/mnt/ceph_vol/models/sam_vit_h_4b8939.pth'
