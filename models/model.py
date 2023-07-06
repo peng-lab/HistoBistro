@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from torchvision import transforms
+import torch.nn.functional as F
 
 from torchvision.models import resnet
 from models.ctran import ctranspath
@@ -9,7 +10,7 @@ from models.resnet_retccl import resnet50 as retccl_res50
 from models.simsalabim import ResNetSimCLR
 from models.sam import build_sam_vit_h,build_sam_vit_b,build_sam_vit_l
 from models.imagebind import imagebind_huge
-from transformers import BeitForImageClassification, Data2VecVisionForImageClassification
+from transformers import  Data2VecVisionModel, BeitFeatureExtractor
 
 # RetCCL can be downloaded here: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL?usp=sharing
 # kimianet download: https://kimialab.uwaterloo.ca/kimia/?smd_process_download=1&download_id=4216
@@ -46,12 +47,8 @@ def get_models(modelnames):
             model=torch.hub.load('facebookresearch/dinov2', modelname.lower())
         elif modelname.lower()=="imagebind":
             model=get_imagebind()
-        elif modelname.lower()=='beit_microsoft':
-            model = BeitForImageClassification.from_pretrained('microsoft/beit-base-patch16-224-pt22k-ft22k')
         elif modelname.lower()=='beit_fb':
-            model = Data2VecVisionForImageClassification.from_pretrained('facebook/data2vec-vision-base-ft1k')
-
-        
+            model = BeitModel(device)
         """
         # torch.compile does not work with DataParallel
         if torch.cuda.device_count() > 1:
@@ -67,6 +64,7 @@ def get_models(modelnames):
         models.append({'name': modelname, 'model': 
             model.to(device), 'transforms': transforms})
     return models
+
 
 def get_sam_vit_h():
     return build_sam_vit_h(SAM_VIT_H_PATH)
@@ -128,7 +126,7 @@ def get_transforms(model_name):
     mean = (0.485, 0.456, 0.406)
     std = (0.229, 0.224, 0.225)
 
-    if model_name.lower() in ['ctranspath', 'resnet50',"simclr_lung", 'beit_fb','beit_microsoft']:
+    if model_name.lower() in ['ctranspath', 'resnet50',"simclr_lung", 'beit_fb']:
         resolution = 224
     elif model_name.lower() == 'retccl':
         resolution = 256
@@ -154,7 +152,13 @@ def get_transforms(model_name):
         transforms.Normalize(mean=mean, std=std)
     ]
 
-    if "sam" in model_name.lower():
+    if 'beit_fb' in model_name.lower():
+        transforms_list = [
+        transforms.Resize(resolution),
+        transforms.ToTensor(),
+    ]
+    
+    elif "sam" in model_name.lower():
         # multiply image by 255 for "sam" model
         transforms_list = [
         transforms.Resize(resolution),
@@ -167,6 +171,28 @@ def get_transforms(model_name):
     return preprocess_transforms
 
 
+class BeitModel(torch.nn.Module):
+    def __init__(self, device, pretrained_model='facebook/data2vec-vision-base', image_size=224, patch_size=16):
+        super(BeitModel, self).__init__()
+        self.feature_extractor = BeitFeatureExtractor.from_pretrained(pretrained_model)
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.model =  Data2VecVisionModel.from_pretrained(pretrained_model)
+        self.device=device
+        self.avg_pooling=nn.AdaptiveAvgPool1d((1))
+
+    def forward(self, images):
+        inputs = self.feature_extractor(images=images, return_tensors="pt")
+        inputs=inputs['pixel_values'].to(self.device)
+        outputs = self.model(inputs, output_hidden_states=True, return_dict=True)
+        encoder_hidden_states = outputs.hidden_states
+
+        # The provided code was taking only the 13th layer, I kept that behaviour
+        features = encoder_hidden_states[12][:,1:,:].permute(0,2,1)
+        features=self.avg_pooling(features)
+
+        return features.squeeze()
     
+
 if __name__ == '__main__':
     get_models(['resnet50'])

@@ -12,7 +12,7 @@ from PIL import Image
 # import cv2
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-#from transformers import BeitFeatureExtractor, BeitImageProcessor
+
 
 from dataset import SlideDataset
 from models.model import get_models
@@ -47,7 +47,7 @@ parser.add_argument(
     "--models",
     help="select model ctranspath, retccl, all",
     nargs="+",
-    default=["ctranspath"],
+    default=["beit_fb"],
     type=str,
 )
 parser.add_argument(
@@ -109,7 +109,7 @@ parser.add_argument(
 parser.add_argument(
     "--preview_size", help="size of tile_preview", default=4096, type=int
 )
-parser.add_argument("--batch_size", default=32, type=int)
+parser.add_argument("--batch_size", default=16, type=int)
 parser.add_argument(
     "--exctraction_list",
     help="if only a subset of the slides should be extracted save their names in a csv",
