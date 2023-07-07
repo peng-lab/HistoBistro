@@ -15,7 +15,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
 from classifier import ClassifierLightning
-from data_utils import MILDatasetIndices, get_multi_cohort_df
+from data_utils import MILDataset, get_multi_cohort_df
 from options import Options
 from utils import save_results
 
@@ -44,7 +44,7 @@ def main(cfg):
     print('\n--- load dataset ---')
     categories = ['Not mut.', 'Mutat.', 'nonMSIH', 'MSIH', 'WT', 'MUT', 'wt', 'MT']
     data, clini_info = get_multi_cohort_df(
-        cfg.data_config, cfg.cohorts, [cfg.target], categories, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
+        cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
     )
     cfg.clini_info = clini_info
     cfg.input_dim += len(cfg.clini_info.keys())
@@ -60,9 +60,9 @@ def main(cfg):
     test_ext_dataloader = []
     for ext in cfg.ext_cohorts:
         test_data, clini_info = get_multi_cohort_df(
-            cfg.data_config, ext, [cfg.target], categories, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
+            cfg.data_config, [ext], [cfg.target], cfg.label_dict, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
         )
-        dataset_ext = MILDatasetIndices(
+        dataset_ext = MILDataset(
             test_data,
             list(range(len(data))), [cfg.target],
             categories,

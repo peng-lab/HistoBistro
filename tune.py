@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 import wandb
 
 from options import Options
-from data_utils import MILDatasetIndices, get_multi_cohort_df
+from data_utils import MILDataset, get_multi_cohort_df
 from classifier import ClassifierLightning
 
 import optuna
@@ -72,14 +72,14 @@ norm_test = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.n
 # --------------------------------------------------------
 print('\n--- load dataset ---')
 categories = ['Not mut.', 'Mutat.', 'nonMSIH', 'MSIH', 'WT', 'MUT', 'wt', 'MT']
-data = get_multi_cohort_df(cfg.cohorts, [cfg.target], categories, norm=cfg.norm, feats=cfg.feats)
+data = get_multi_cohort_df(cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats)
 
 test_ext_dataloader = []
 for ext in cfg.ext_cohorts:
     test_data, clini_info = get_multi_cohort_df(
-        cfg.data_config, ext, [cfg.target], categories, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
+        cfg.data_config, ext, [cfg.target], cfg.label_dict, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
     )
-    dataset_ext = MILDatasetIndices(
+    dataset_ext = MILDataset(
         test_data,
         list(range(len(data))), [cfg.target],
         categories,
@@ -104,7 +104,7 @@ train_idxs, val_idxs = train_test_split(
 )
 
 # training dataset
-train_dataset = MILDatasetIndices(
+train_dataset = MILDataset(
     data, train_idxs, [cfg.target], num_tiles=cfg.num_tiles, pad_tiles=cfg.pad_tiles, norm=cfg.norm
 )
 train_dataloader = DataLoader(
@@ -112,7 +112,7 @@ train_dataloader = DataLoader(
 )
 
 # validation dataset
-val_dataset = MILDatasetIndices(data, val_idxs, [cfg.target], norm=norm_val)
+val_dataset = MILDataset(data, val_idxs, [cfg.target], norm=norm_val)
 val_dataloader = DataLoader(
     dataset=val_dataset, batch_size=1, shuffle=False, num_workers=14, pin_memory=True
 )

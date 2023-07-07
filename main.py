@@ -15,7 +15,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
 from classifier import ClassifierLightning
-from data_utils import MILDatasetIndices, get_multi_cohort_df
+from data_utils import MILDataset, get_multi_cohort_df
 from options import Options
 from utils import save_results
 
@@ -45,9 +45,8 @@ def main(cfg):
     # load data
     # --------------------------------------------------------
     print('\n--- load dataset ---')
-    categories = cfg.label_dict.keys()
     data, clini_info = get_multi_cohort_df(
-        cfg.data_config, cfg.cohorts, [cfg.target], categories, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
+        cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
     )
     cfg.clini_info = clini_info
     cfg.input_dim += len(cfg.clini_info.keys())
@@ -63,15 +62,13 @@ def main(cfg):
     test_ext_dataloader = []
     for ext in cfg.ext_cohorts:
         test_data, clini_info = get_multi_cohort_df(
-            cfg.data_config, ext, [cfg.target], categories, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
+            cfg.data_config, [ext], [cfg.target], cfg.label_dict, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
         )
-        dataset_ext = MILDatasetIndices(
+        dataset_ext = MILDataset(
             test_data,
-            list(range(len(data))), [cfg.target],
-            categories,
+            list(range(len(test_data))), [cfg.target],
+            clini_info=clini_info,
             norm=norm_test,
-            feats=cfg.feats,
-            clini_info=cfg.clini_info
         )
         test_ext_dataloader.append(DataLoader(dataset=dataset_ext, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True))
     
@@ -99,7 +96,7 @@ def main(cfg):
             patient_df['PATIENT'][test_idxs].to_csv(fold_path / f'folds_{cfg.logging_name}_fold{l}_test.csv')
 
         # training dataset
-        train_dataset = MILDatasetIndices(
+        train_dataset = MILDataset(
             data,
             train_idxs, [cfg.target],
             num_tiles=cfg.num_tiles,
@@ -115,22 +112,23 @@ def main(cfg):
             cfg.val_check_interval = len(train_dataset)
         
         # validation dataset
-        val_dataset = MILDatasetIndices(data, val_idxs, [cfg.target], norm=norm_val, clini_info=cfg.clini_info)
+        val_dataset = MILDataset(data, val_idxs, [cfg.target], norm=norm_val, clini_info=cfg.clini_info)
         print(f'num validation samples in fold {l}: {len(val_dataset)}')
         val_dataloader = DataLoader(
             dataset=val_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
         )
 
         # test dataset (in-domain)
-        test_dataset = MILDatasetIndices(data, test_idxs, [cfg.target], norm=norm_test, clini_info=cfg.clini_info)
+        test_dataset = MILDataset(data, test_idxs, [cfg.target], norm=norm_test, clini_info=cfg.clini_info)
         print(f'num test samples in fold {l}: {len(test_dataset)}')
         test_dataloader = DataLoader(
             dataset=test_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
         )
 
-        num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
-        cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
-        cfg.criterion = "BCEWithLogitsLoss"
+        # set class weighting for binary classification
+        if cfg.task == 'binary':
+            num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
+            cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
 
         # --------------------------------------------------------
         # model
@@ -179,6 +177,7 @@ def main(cfg):
             # limit_val_batches=0.1,  # debug
             # limit_train_batches=6,  # debug
             # limit_val_batches=6,    # debug
+            limit_test_batches=10,
             # log_every_n_steps=1,  # debug
             # fast_dev_run=True,    # debug
             # max_steps=6,          # debug
