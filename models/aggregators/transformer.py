@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from einops import repeat
-from models.aggregators import BaseAggregator
+from models.aggregators.aggregator import BaseAggregator
 from models.aggregators.model_utils import PreNorm, SinusoidalPositionalEmbedding, Attention, FeedForward
 
 

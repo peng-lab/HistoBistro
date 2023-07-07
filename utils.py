@@ -22,26 +22,25 @@ def get_loss(name, **kwargs):
         raise ValueError(f"Invalid loss name: {name}")
 
 
-# TODO: finish get_model
-def get_model(model_name):
+def get_model(model_name, **kwargs):
     """
-    Import the module "model/[model_name].py".
-    In the file, the class called DatasetNameDataset() will
-    be instantiated. It has to be a subclass of TissueDataset,
-    and it is case-insensitive.
+    Import the module "model/aggregators/[model_name.lower()].py".
+    In the file, the class called model_name will
+    be instantiated. It has to be a subclass of BaseAggregator,
+    and it is case-sensitive.
     """
-    model_filename = "model.aggregator" + model_name
+    model_filename = "models.aggregators." + model_name.lower()
     model_library = importlib.import_module(model_filename)
 
-    model = None
-    target_model_name = model_name.replace('_', '') + 'Model'
+    model_class = None
     for name, cls in model_library.__dict__.items():
-        if name.lower() == target_model_name.lower() \
-           and issubclass(cls, BaseAggregator):
-            model = cls
+        if name == model_name and issubclass(cls, BaseAggregator):
+            model_class = cls
 
-    if model is None:
+    if model_class is None:
         raise NotImplementedError("Model does not exist!")
+
+    model = model_class(**kwargs)
 
     return model
 
@@ -110,3 +109,11 @@ def save_results(cfg, results, base_path, train_cohorts, test_cohorts):
         existing = pd.read_csv(base_path / f'results_{cfg.logging_name}.csv', sep=',')
         results_df = pd.concat([existing, results_df], ignore_index=True)
     results_df.to_csv(base_path / f'results_{cfg.logging_name}.csv', sep=',', index=False)
+
+
+# test get_model function for all models
+get_model('Transformer', num_classes=4, input_dim=512)
+get_model('AttentionMIL', num_classes=4, input_dim=512)
+# get_model('LAMIL', num_classes=4, input_dim=512)
+get_model('Perceiver', num_classes=4, input_dim=512)
+get_model('TransMIL', num_classes=4, input_dim=512)

@@ -8,7 +8,7 @@ from typing import Optional
 class AttentionMIL(BaseAggregator):
     def __init__(
         self,
-        num_features: int,
+        input_dim: int,
         num_classes: int,
         encoder: Optional[nn.Module] = None,
         attention: Optional[nn.Module] = None,
@@ -22,7 +22,7 @@ class AttentionMIL(BaseAggregator):
         """
         super(BaseAggregator, self).__init__()
         self.encoder = encoder or nn.Sequential(
-            nn.Linear(num_features, 256), nn.ReLU()
+            nn.Linear(input_dim, 256), nn.ReLU()
         )
         self.attention = attention or MILAttention(256)
         self.head = head or nn.Sequential(
