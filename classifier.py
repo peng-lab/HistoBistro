@@ -17,7 +17,7 @@ class ClassifierLightning(pl.LightningModule):
         # TODO use get_model function
         self.model = Transformer(num_classes=config.num_classes, input_dim=config.input_dim, pool='cls')
         # self.model = AttentionMIL(config.input_dim, config.num_classes)
-        self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight)
+        self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight) if config.task == "binary" else get_loss(config.criterion)
         # TODO save config file correctly (with self.save_hyperparameters?)
         self.save_hyperparameters()
         
@@ -107,7 +107,8 @@ class ClassifierLightning(pl.LightningModule):
         preds = torch.argmax(logits, dim=1, keepdim=True)
         # self.lr_schedulers().step()
 
-        self.acc_train(preds, y)
+        probs = torch.softmax(logits, dim=1)
+        self.acc_train(probs, y)  # preds
         self.log("acc/train", self.acc_train, prog_bar=True)
         self.log("loss/train", loss, prog_bar=False)
 
@@ -116,11 +117,14 @@ class ClassifierLightning(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, _, y, _, _ = batch  # x = features, y = labels
         logits = self.forward(x)
+        # if config.task == "multiclass":
+        #     y = y.squeeze(-1)
         loss = self.criterion(logits, y)
-        probs = torch.sigmoid(logits)
+        # probs = torch.sigmoid(logits)
+        probs = torch.softmax(logits, dim=1)
         preds = torch.argmax(probs, dim=1, keepdim=True)
         
-        self.acc_val(preds, y)
+        self.acc_val(probs, y)  # preds
         self.auroc_val(probs, y)
         self.f1_val(probs, y)
         self.precision_val(probs, y)
@@ -144,11 +148,12 @@ class ClassifierLightning(pl.LightningModule):
         x, _, y, _, patient = batch  # x = features, y = labels
         logits = self.forward(x)
         loss = self.criterion(logits, y)
-        probs = torch.sigmoid(logits)
-        preds = torch.round(probs)
+        # probs = torch.sigmoid(logits)
+        probs = torch.softmax(logits, dim=1)
+        preds = torch.argmax(probs, dim=1, keepdim=True)
         
 
-        self.acc_test(preds, y)
+        self.acc_test(probs, y)  # preds
         self.auroc_test(probs, y)
         self.f1_test(probs, y)
         self.precision_test(probs, y)
@@ -165,7 +170,7 @@ class ClassifierLightning(pl.LightningModule):
 
         # TODO rewrite for batch size > 1 (not needed atm bc bs=1 always in testing mode)
         outputs = pd.DataFrame(
-            data=[[patient[0], y.item(), preds.item(), logits.item(), (y==preds).int().item()]], 
-            columns=['patient', 'ground_truth', 'predictions', 'logits', 'correct']
+            data=[[patient[0], y.item(), preds.item(), logits.squeeze(), (y==preds).int().item()]], 
+            columns=['patient', 'ground_truth', 'prediction', 'logits', 'correct']
         )
         self.outputs = pd.concat([self.outputs, outputs], ignore_index=True)
