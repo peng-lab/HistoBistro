@@ -14,7 +14,7 @@ class ClassifierLightning(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.model = get_model(self.config.model, num_classes=self.config.num_classes, input_dim=config.input_dim)
+        self.model = get_model(self.config.model, num_classes=self.config.num_classes, input_dim=config.input_dim, pos_enc='CoordinateEmbedding')
         self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight) if config.task == "binary" else get_loss(config.criterion)
         # TODO save config file correctly (with self.save_hyperparameters?)
         self.save_hyperparameters()
@@ -80,8 +80,8 @@ class ClassifierLightning(pl.LightningModule):
             num_classes=config.num_classes,
         )
 
-    def forward(self, x):
-        logits = self.model(x)
+    def forward(self, x, *args):
+        logits = self.model(x, *args)
         return logits
 
     def configure_optimizers(self):
@@ -99,8 +99,8 @@ class ClassifierLightning(pl.LightningModule):
         return [optimizer] # , [scheduler]
 
     def training_step(self, batch, batch_idx):
-        x, _, y, _, _ = batch  # x = features, y = labels
-        logits = self.forward(x)
+        x, coords, y, _, _ = batch  # x = features, coords, y = labels, tiles, patient
+        logits = self.forward(x, coords)
         loss = self.criterion(logits, y)
         preds = torch.argmax(logits, dim=1, keepdim=True)
         # self.lr_schedulers().step()
@@ -113,8 +113,8 @@ class ClassifierLightning(pl.LightningModule):
         return loss
 
     def validation_step(self, batch, batch_idx):
-        x, _, y, _, _ = batch  # x = features, y = labels
-        logits = self.forward(x)
+        x, coords, y, _, _ = batch  # x = features, coords, y = labels, tiles, patient
+        logits = self.forward(x, coords)
         # if config.task == "multiclass":
         #     y = y.squeeze(-1)
         loss = self.criterion(logits, y)
@@ -143,8 +143,8 @@ class ClassifierLightning(pl.LightningModule):
         self.outputs = pd.DataFrame(columns=column_names)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
-        x, _, y, _, patient = batch  # x = features, y = labels
-        logits = self.forward(x)
+        x, coords, y, _, _ = batch  # x = features, coords, y = labels, tiles, patient
+        logits = self.forward(x, coords)
         loss = self.criterion(logits, y)
         # probs = torch.sigmoid(logits)
         probs = torch.softmax(logits, dim=1)

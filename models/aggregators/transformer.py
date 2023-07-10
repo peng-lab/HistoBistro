@@ -3,6 +3,7 @@ import torch.nn as nn
 from einops import repeat
 from models.aggregators.aggregator import BaseAggregator
 from models.aggregators.model_utils import PreNorm, SinusoidalPositionalEmbedding, Attention, FeedForward
+from models.aggregators.positional_encodings import CoordinateEmbedding
 
 
 class TransformerBlocks(nn.Module):
@@ -41,7 +42,8 @@ class Transformer(BaseAggregator):
         pool='cls',
         dim_head=64,
         dropout=0.,
-        emb_dropout=0.
+        emb_dropout=0.,
+        pos_enc=None,
     ):
         super(BaseAggregator, self).__init__()
         assert pool in {
@@ -57,9 +59,12 @@ class Transformer(BaseAggregator):
 
         self.norm = nn.LayerNorm(dim)
         self.dropout = nn.Dropout(emb_dropout)
-        self.pos_emb = SinusoidalPositionalEmbedding(dim)
+        self.pos_enc = pos_enc
+        if pos_enc == 'CoordinateEmbedding':
+            self.pos_enc = CoordinateEmbedding(2, input_dim)
+        # self.pos_emb = SinusoidalPositionalEmbedding(dim)
 
-    def forward(self, x, use_pos=False, register_hook=False):
+    def forward(self, x, coords=None, register_hook=False):
         b, _, _ = x.shape
 
         x = self.projection(x)
@@ -68,8 +73,8 @@ class Transformer(BaseAggregator):
             cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
             x = torch.cat((cls_tokens, x), dim=1)
 
-        if use_pos:
-            x += self.pos_emb(x)
+        if self.pos_enc:
+            x += self.pos_enc(coords)
 
         x = self.dropout(x)
         x = self.transformer(x, register_hook=register_hook)
@@ -80,3 +85,4 @@ class Transformer(BaseAggregator):
 
 transformer = Transformer(num_classes=2)
 transformer(torch.rand(1, 1, 2048))
+
