@@ -61,7 +61,7 @@ class Transformer(BaseAggregator):
         self.dropout = nn.Dropout(emb_dropout)
         self.pos_enc = pos_enc
         if pos_enc == 'CoordinateEmbedding':
-            self.pos_enc = CoordinateEmbedding(2, input_dim)
+            self.pos_enc = CoordinateEmbedding(2, dim)
         # self.pos_emb = SinusoidalPositionalEmbedding(dim)
 
     def forward(self, x, coords=None, register_hook=False):
@@ -69,12 +69,12 @@ class Transformer(BaseAggregator):
 
         x = self.projection(x)
 
+        if self.pos_enc:
+            x = x + self.pos_enc(coords)
+
         if self.pool == 'cls':
             cls_tokens = repeat(self.cls_token, '1 1 d -> b 1 d', b=b)
             x = torch.cat((cls_tokens, x), dim=1)
-
-        if self.pos_enc:
-            x += self.pos_enc(coords)
 
         x = self.dropout(x)
         x = self.transformer(x, register_hook=register_hook)
