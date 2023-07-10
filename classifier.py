@@ -143,7 +143,7 @@ class ClassifierLightning(pl.LightningModule):
         self.outputs = pd.DataFrame(columns=column_names)
 
     def test_step(self, batch, batch_idx, dataloader_idx=0):
-        x, coords, y, _, _ = batch  # x = features, coords, y = labels, tiles, patient
+        x, coords, y, _, patient = batch  # x = features, coords, y = labels, tiles, patient
         logits = self.forward(x, coords)
         loss = self.criterion(logits, y)
         # probs = torch.sigmoid(logits)
