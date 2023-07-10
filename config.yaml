@@ -57,14 +57,21 @@ label_dict:
     MUT: 1
     wt: 0
     MT: 1
+    # clinical information
     left: 1
     right: 0
     female: 1
     male: 0
+    # CRC staging
     Stage I: 0
     Stage II: 1
     Stage III: 2
     Stage IV: 3
+    # dermAI / HistoGPT project
+    Aktinische Keratose: 0
+    Basalzellkarzinom: 1
+    Benign Neoplasm: 2
+    Spinozelluläres Karzinom: 3
 
 
 # model options

@@ -23,7 +23,8 @@ class Options:
         # model options
         self.parser.add_argument('--model', type=str, help='costum prefix for logging')
         self.parser.add_argument('--norm', type=str, help='type of pre-processing')
-        self.parser.add_argument('--feats', type=str, help='type of features ')
+        self.parser.add_argument('--feats', type=str, help='type of features')
+        self.parser.add_argument('--input_dim', type=int, help='dimension of features')
         self.parser.add_argument('--num_tiles', type=int, help='number of tiles to sample from all tiles')    
         self.parser.add_argument('--pad_tiles', type=bool, help='whether to pad the tiles up to num_tiles if #tiles is smaller than num_tiles')
         

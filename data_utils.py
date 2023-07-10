@@ -242,12 +242,20 @@ class MILDataset(Dataset):
                 features = torch.Tensor(np.array(h5_file['augmented']))
             version = torch.randint(features.shape[0], (1,)).item()
             features = features[version]
-        else: 
-            features = torch.Tensor(np.array(h5_file['feats']))
-        if 'coords' in h5_file.keys():
-            coords = torch.Tensor(np.array(h5_file['coords']))
         else:
+            if 'feats' in h5_file.keys():
+                features = torch.Tensor(np.array(h5_file['feats']))
+            else:
+                features = torch.Tensor(np.array(h5_file['features']))
+        try:
+            coords = torch.Tensor(np.array(h5_file['coords']))
+        except TypeError or KeyError:
             coords = 0  # NoneType is not accepted by dataloader
+
+        # avoid CUDA OOM
+        if features.shape[0] > 10000:
+            feat_idxs = torch.randperm(features.shape[0])[:10000]
+            features = features[feat_idxs]
 
         # randomly sample num_tiles tiles, if #tiles < num_tiles, fill vector with 0s 
         tiles = torch.tensor([features.shape[0]])  # only needed for AttentionMIL implementation
