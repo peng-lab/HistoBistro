@@ -73,7 +73,7 @@ def get_scheduler(name, optimizer, **kwargs):
         raise ValueError(f"Invalid scheduler name: {name}")
     
 
-def save_results(cfg, results, base_path, train_cohorts, test_cohorts):
+def save_results(cfg, results, base_path, train_cohorts, test_cohorts, mode="test"):
     # save results to dataframe 
     labels_per_fold = list(results[test_cohorts[0]][0].keys())
     labels_mean_std = [f'{l} {v}' for l in labels_per_fold for v in ['mean', 'std']]
@@ -106,9 +106,9 @@ def save_results(cfg, results, base_path, train_cohorts, test_cohorts):
     results_df = results_df[cols]
     # append to existing dataframe
     if Path(base_path / f'results_{cfg.logging_name}.csv').is_file():
-        existing = pd.read_csv(base_path / f'results_{cfg.logging_name}.csv', sep=',')
+        existing = pd.read_csv(base_path / f'results_{mode}_{cfg.logging_name}.csv', sep=',')
         results_df = pd.concat([existing, results_df], ignore_index=True)
-    results_df.to_csv(base_path / f'results_{cfg.logging_name}.csv', sep=',', index=False)
+    results_df.to_csv(base_path / f'results_{mode}_{cfg.logging_name}.csv', sep=',', index=False)
 
 
 # test get_model function for all models
