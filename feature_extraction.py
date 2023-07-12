@@ -28,26 +28,26 @@ parser = argparse.ArgumentParser(description="Feature extraction")
 parser.add_argument(
     "--slide_path",
     help="path of slides to extract features from",
-    default="/mnt/ceph_vol/raw_data/2019",
+    default="/mnt/ceph_vol/test_data_manu",
     type=str,
 )
 parser.add_argument(
     "--save_path",
     help="path to save everything",
-    default="/mnt/ceph_vol/features/2019/",
+    default="/mnt/ceph_vol/features/test_manu/",
     type=str,
 )
 parser.add_argument(
     "--file_extension",
     help="file extension the slides are saved under, e.g. tiff",
-    default=".czi",
+    default=".ndpi",
     type=str,
 )
 parser.add_argument(
     "--models",
     help="select model ctranspath, retccl, all",
     nargs="+",
-    default=["beit_fb"],
+    default=["ctranspath"],
     type=str,
 )
 parser.add_argument(
@@ -62,7 +62,8 @@ parser.add_argument(
     "--white_thresh",
     help="if all RGB pixel values are larger than this value, the pixel is considered as white/background",
     default=[170, 185, 175],
-    type=list,
+    nargs='+',
+    type=int,
 )
 parser.add_argument(
     "--black_thresh",
@@ -79,7 +80,7 @@ parser.add_argument(
 parser.add_argument(
     "--edge_threshold",
     help="canny edge detection threshold. if smaller than this value, patch gets discarded",
-    default=2,
+    default=1,
     type=int,
 )
 parser.add_argument(
@@ -91,7 +92,7 @@ parser.add_argument(
 parser.add_argument(
     "--downscaling_factor",
     help="only used if >0, overrides manual resolution. needed if resolution not given",
-    default=8,
+    default=4,
     type=float,
 )
 parser.add_argument(
@@ -103,7 +104,7 @@ parser.add_argument(
 parser.add_argument(
     "--save_patch_images",
     help="True if each patch should be saved as an image",
-    default=False,
+    default=True,
     type=bool,
 )
 parser.add_argument(
@@ -126,7 +127,8 @@ parser.add_argument(
     "--calc_thresh",
     help="darker colours than this are considered calc",
     default=[40, 40, 40],
-    type=list,
+    nargs='+',
+    type=int,
 )
 
 

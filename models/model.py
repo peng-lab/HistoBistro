@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torchvision import transforms
-import torch.nn.functional as F
 
 from torchvision.models import resnet
 from models.ctran import ctranspath
