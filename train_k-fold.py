@@ -163,11 +163,11 @@ def main(cfg):
         trainer = pl.Trainer(
             logger=[logger, csv_logger],
             accelerator='auto',
-            # TODO enable multiple gpu training with splitting (only one process)
+            # TODO enable multiple gpu training with splitting (only one process), maybe with strategy='ddp_spawn' and pickling
             devices=1,
             callbacks=[checkpoint_callback],
             max_epochs=cfg.num_epochs,
-            val_check_interval=cfg.val_check_interval,  # // torch.cuda.device_count(),
+            val_check_interval=cfg.val_check_interval, # // torch.cuda.device_count(),
             check_val_every_n_epoch=None,
             # limit_val_batches=0.1,  # debug
             # limit_train_batches=6,  # debug
