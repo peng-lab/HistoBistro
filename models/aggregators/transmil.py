@@ -6,7 +6,7 @@ from models.aggregators.model_utils import PPEG, NystromTransformerLayer
 
 
 class TransMIL(BaseAggregator):
-    def __init__(self, num_classes, input_dim=1024):
+    def __init__(self, num_classes, input_dim=1024, **kwargs):
         super(BaseAggregator, self).__init__()
         self.pos_layer = PPEG(dim=512)
         self._fc1 = nn.Sequential(nn.Linear(input_dim, 512), nn.ReLU())
@@ -17,7 +17,7 @@ class TransMIL(BaseAggregator):
         self.norm = nn.LayerNorm(512)
         self._fc2 = nn.Linear(512, self.num_classes)
 
-    def forward(self, x):
+    def forward(self, x, coords=None):
 
         h = x  #[B, n, 1024]
 
