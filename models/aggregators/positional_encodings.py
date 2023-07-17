@@ -47,11 +47,11 @@ class PositionalEncoding2D(nn.Module):
 
         pos_x, pos_y = coords[:, :, 0], coords[:, :, 1]
         # outer product indpendent of batch size b
-        sin_inp_x = torch.einsum("bi,bj->bij", pos_x, self.inv_freq.unsqueeze(0))
-        sin_inp_y = torch.einsum("bi,bj->bij", pos_y, self.inv_freq.unsqueeze(0))
+        sin_inp_x = torch.einsum("bi,bj->bij", pos_x, self.inv_freq.unsqueeze(0).to(coords.device))
+        sin_inp_y = torch.einsum("bi,bj->bij", pos_y, self.inv_freq.unsqueeze(0).to(coords.device))
         emb_x = self.get_emb(sin_inp_x)
         emb_y = self.get_emb(sin_inp_y)
-        emb = torch.zeros((bs, n, 2*self.channels))
+        emb = torch.zeros((bs, n, 2*self.channels), device=coords.device)
         emb[:, :, :self.channels] = emb_x
         emb[:, :, self.channels:2*self.channels] = emb_y
 
@@ -65,11 +65,11 @@ class PositionalEncoding2D(nn.Module):
         emb = torch.stack((sin_inp.sin(), sin_inp.cos()), dim=-1)
         return torch.flatten(emb, -2, -1)
 
-
-tokens = torch.rand(1, 3, 2048)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+tokens = torch.rand(1, 3, 2048, device=device)
 # pos_emb = CoordinateEmbedding(2, 2048)
 pos_emb = PositionalEncoding2D(2048)
 # pos_emb = LearnedPositionalEmbedding(2048)
-coords = torch.tensor([[[5124, 22454], [5127, 22855], [6127, 32855]]])
+coords = torch.tensor([[[5124, 22454], [5127, 22855], [6127, 32855]]], device=device)
 tokens += pos_emb(coords)
 print(pos_emb(coords))
