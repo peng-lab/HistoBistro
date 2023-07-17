@@ -175,9 +175,9 @@ def main(cfg):
             val_check_interval=cfg.val_check_interval,
             check_val_every_n_epoch=None,
             # limit_val_batches=0.1,  # debug
-            # limit_train_batches=6,  # debug
+            # limit_train_batches=500,  # debug
             # limit_val_batches=6,    # debug
-            limit_test_batches=10,
+            # limit_test_batches=10,
             # log_every_n_steps=1,  # debug
             # fast_dev_run=True,    # debug
             # max_steps=6,          # debug
