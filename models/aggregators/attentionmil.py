@@ -13,6 +13,7 @@ class AttentionMIL(BaseAggregator):
         encoder: Optional[nn.Module] = None,
         attention: Optional[nn.Module] = None,
         head: Optional[nn.Module] = None,
+        **kwargs
     ) -> None:
         """Create a new attention MIL model.
         Args:
@@ -32,7 +33,7 @@ class AttentionMIL(BaseAggregator):
             nn.Linear(256, num_classes)
         )
 
-    def forward(self, bags, tiles=None, **kwargs):
+    def forward(self, bags, coords=None, tiles=None, **kwargs):
         assert bags.ndim == 3
         if tiles is not None:
             assert bags.shape[0] == tiles.shape[0]
