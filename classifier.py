@@ -14,7 +14,8 @@ class ClassifierLightning(pl.LightningModule):
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.model = get_model(self.config.model, num_classes=self.config.num_classes, input_dim=config.input_dim, pos_enc=config.pos_enc)
+        dim = 514 if config.pos_enc == "ConcatEmbedding" else 512
+        self.model = get_model(self.config.model, num_classes=self.config.num_classes, input_dim=config.input_dim, dim=dim, pos_enc=config.pos_enc)
         self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight) if config.task == "binary" else get_loss(config.criterion)
         # TODO save config file correctly (with self.save_hyperparameters?)
         self.save_hyperparameters()

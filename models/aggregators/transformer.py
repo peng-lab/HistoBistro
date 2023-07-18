@@ -3,7 +3,7 @@ import torch.nn as nn
 from einops import repeat
 from models.aggregators.aggregator import BaseAggregator
 from models.aggregators.model_utils import PreNorm, SinusoidalPositionalEmbedding, Attention, FeedForward
-from models.aggregators.positional_encodings import CoordinateEmbedding, PositionalEncoding2D
+from models.aggregators.positional_encodings import ConcatEmbedding, CoordinateEmbedding, PositionalEncoding2D
 
 
 class TransformerBlocks(nn.Module):
@@ -64,13 +64,17 @@ class Transformer(BaseAggregator):
             self.pos_enc = CoordinateEmbedding(2, dim)
         elif pos_enc == 'PositionalEncoding2D':
             self.pos_enc = PositionalEncoding2D(dim)
+        elif pos_enc == 'ConcatEmbedding':
+            self.pos_enc = ConcatEmbedding(2, 2)
 
     def forward(self, x, coords=None, register_hook=False):
         b, _, _ = x.shape
 
         x = self.projection(x)
 
-        if self.pos_enc:
+        if isinstance(self.pos_enc, ConcatEmbedding):
+            x = torch.cat((x, self.pos_enc(coords)), dim=-1)
+        elif self.pos_enc:
             x = x + self.pos_enc(coords)
 
         if self.pool == 'cls':

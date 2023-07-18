@@ -65,11 +65,31 @@ class PositionalEncoding2D(nn.Module):
         emb = torch.stack((sin_inp.sin(), sin_inp.cos()), dim=-1)
         return torch.flatten(emb, -2, -1)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+class ConcatEmbedding(nn.Module):
+    """
+    Concatenate learned positional embedding to feature vector
+    """
+    def __init__(self, dim_coords: int, dim_emb: int):
+        super().__init__()
+        self.embedding = nn.Linear(dim_coords, dim_emb)
+    
+    def forward(self, coords: torch.Tensor) -> torch.Tensor:
+        # center coordinates around 0
+        coords = coords.float()
+        coords -= coords.mean(dim=1, keepdim=True)
+
+        return self.embedding(coords.float())
+
+
+device = torch.device("cpu") # torch.device("cuda" if torch.cuda.is_available() else "cpu")
 tokens = torch.rand(1, 3, 2048, device=device)
 # pos_emb = CoordinateEmbedding(2, 2048)
-pos_emb = PositionalEncoding2D(2048)
+# pos_emb = PositionalEncoding2D(2048)
 # pos_emb = LearnedPositionalEmbedding(2048)
+pos_emb = ConcatEmbedding(2, 2)
 coords = torch.tensor([[[5124, 22454], [5127, 22855], [6127, 32855]]], device=device)
-tokens += pos_emb(coords)
+# tokens += pos_emb(coords)
+tokens = torch.cat((tokens, pos_emb(coords)), dim=-1)
 print(pos_emb(coords))
+print(tokens.shape)
