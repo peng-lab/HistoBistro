@@ -1,9 +1,12 @@
 from pathlib import Path
+from matplotlib import pyplot as plt
 import pandas as pd
+import seaborn as sns
 import torch
 import torchmetrics
 import pytorch_lightning as pl
 from torch.nn import functional as F
+import wandb
 
 from utils import get_model, get_loss, get_optimizer, get_scheduler
 from models.aggregators.transformer import Transformer
@@ -80,6 +83,15 @@ class ClassifierLightning(pl.LightningModule):
             task=config.task,
             num_classes=config.num_classes,
         )
+        
+        self.cm_val = torchmetrics.ConfusionMatrix(
+            task=config.task,
+            num_classes=config.num_classes
+        )
+        self.cm_test = torchmetrics.ConfusionMatrix(
+            task=config.task,
+            num_classes=config.num_classes
+        )
 
     def forward(self, x, *args):
         logits = self.model(x, *args)
@@ -129,7 +141,8 @@ class ClassifierLightning(pl.LightningModule):
         self.precision_val(probs, y)
         self.recall_val(probs, y)
         self.specificity_val(probs, y)
-
+        self.cm_val(probs, y)
+        
         self.log("loss/val", loss, prog_bar=True)
         self.log("acc/val", self.acc_val, prog_bar=True, on_step=False, on_epoch=True)
         self.log("auroc/val", self.auroc_val, prog_bar=True, on_step=False, on_epoch=True)
@@ -137,6 +150,21 @@ class ClassifierLightning(pl.LightningModule):
         self.log("precision/val", self.precision_val, prog_bar=False, on_step=False, on_epoch=True)
         self.log("recall/val", self.recall_val, prog_bar=False, on_step=False, on_epoch=True)
         self.log("specificity/val", self.specificity_val, prog_bar=False, on_step=False, on_epoch=True)
+        
+    def on_validation_epoch_end(self):
+        if self.global_step != 0:
+            cm = self.cm_val.compute()
+        
+            # normalise the confusion matrix 
+            norm = cm.sum(axis=1, keepdims=True)
+            normalized_cm = cm / norm 
+            
+            # log to wandb
+            plt.clf()
+            cm = sns.heatmap(normalized_cm.cpu(), annot=cm.cpu(), cmap='rocket_r', vmin=0, vmax=1)
+            wandb.log({"confusion_matrix/val": wandb.Image(cm)})
+            
+        self.cm_val.reset()
     
     def on_test_epoch_start(self) -> None:
         # save test outputs in dataframe per test dataset
@@ -151,13 +179,13 @@ class ClassifierLightning(pl.LightningModule):
         probs = torch.softmax(logits, dim=1)
         preds = torch.argmax(probs, dim=1, keepdim=True)
         
-
         self.acc_test(probs, y)  # preds
         self.auroc_test(probs, y)
         self.f1_test(probs, y)
         self.precision_test(probs, y)
         self.recall_test(probs, y)
         self.specificity_test(probs, y)
+        self.cm_test(probs, y)
 
         self.log("loss/test", loss, prog_bar=False)
         self.log("acc/test", self.acc_test, prog_bar=True, on_step=False, on_epoch=True)
@@ -173,3 +201,18 @@ class ClassifierLightning(pl.LightningModule):
             columns=['patient', 'ground_truth', 'prediction', 'logits', 'correct']
         )
         self.outputs = pd.concat([self.outputs, outputs], ignore_index=True)
+        
+    def on_test_epoch_end(self):
+        if self.global_step != 0:
+            cm = self.cm_test.compute()
+        
+            # normalise the confusion matrix 
+            norm = cm.sum(axis=1, keepdims=True)
+            normalized_cm = cm / norm 
+            
+            # log to wandb
+            plt.clf()
+            cm = sns.heatmap(normalized_cm.cpu(), annot=cm.cpu(), cmap='rocket_r', vmin=0, vmax=1)
+            wandb.log({"confusion_matrix/test": wandb.Image(cm)})
+            
+        self.cm_test.reset()
