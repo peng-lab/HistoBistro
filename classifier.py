@@ -92,22 +92,27 @@ class ClassifierLightning(pl.LightningModule):
             lr=self.lr,
             wd=self.wd
         )
-        # TODO add lr scheduler
-        # scheduler = self.scheduler(
-        #     name=self.config.scheduler,
-        #     optimizer=optimizer, 
-        # )
-        return [optimizer] # , [scheduler]
+        scheduler = get_scheduler(
+            name=self.config.scheduler,
+            optimizer=optimizer
+        )
+        return [optimizer], [scheduler]
 
     def training_step(self, batch, batch_idx):
         x, coords, y, _, _ = batch  # x = features, coords, y = labels, tiles, patient
         logits = self.forward(x, coords)
-        loss = self.criterion(logits, y)
+        if self.config.task == "binary":
+            loss = self.criterion(logits, y.unsqueeze(0).float()) 
+        else:           
+            loss = self.criterion(logits, y)            
         preds = torch.argmax(logits, dim=1, keepdim=True)
         # self.lr_schedulers().step()
 
-        probs = torch.softmax(logits, dim=1)
-        self.acc_train(probs, y)  # preds
+        if self.config.task == "binary":
+            self.acc_train(preds, y.unsqueeze(1))
+        else:
+            probs = torch.softmax(logits, dim=1)
+            self.acc_train(probs, y)
         self.log("acc/train", self.acc_train, prog_bar=True)
         self.log("loss/train", loss, prog_bar=False)
 
@@ -146,12 +151,16 @@ class ClassifierLightning(pl.LightningModule):
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         x, coords, y, _, patient = batch  # x = features, coords, y = labels, tiles, patient
         logits = self.forward(x, coords)
-        loss = self.criterion(logits, y)
+        if self.config.task == "binary":
+            loss = self.criterion(logits, y.unsqueeze(0).float()) 
+        else:           
+            loss = self.criterion(logits, y)      
         # probs = torch.sigmoid(logits)
         probs = torch.softmax(logits, dim=1)
         preds = torch.argmax(probs, dim=1, keepdim=True)
         
-
+        if self.config.task == "binary":
+            y = y.unsqueeze(1)
         self.acc_test(probs, y)  # preds
         self.auroc_test(probs, y)
         self.f1_test(probs, y)
