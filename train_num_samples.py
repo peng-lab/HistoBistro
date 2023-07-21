@@ -11,7 +11,6 @@ import torch
 import wandb
 import yaml
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import CSVLogger, WandbLogger
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
@@ -65,14 +64,13 @@ def main(cfg):
     test_ext_dataloader = []
     for ext in cfg.ext_cohorts:
         test_data, clini_info = get_multi_cohort_df(
-            cfg.data_config, ext, [cfg.target], cfg.label_dict, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
+            cfg.data_config, [ext], [cfg.target], cfg.label_dict, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
         )
         dataset_ext = MILDataset(
             test_data,
-            list(range(len(data))), [cfg.target],
-            categories,
+            list(range(len(test_data))), 
+            [cfg.target],
             norm=norm_test,
-            feats=cfg.feats,
             clini_info=cfg.clini_info
         )
         test_ext_dataloader.append(DataLoader(dataset=dataset_ext, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True))
@@ -83,7 +81,7 @@ def main(cfg):
     print(f'num training samples in {cfg.cohorts}: {len(data)}')
 
     # start training
-    num_samples = [62, 128, 256, 512, 1024, 2048, 4096, 8192, len(data)] if args.num_samples is None else [args.num_samples, ]
+    num_samples = [64, 128, 256, 512, 1024, 2048, 4096, 8192, len(data)] if args.num_samples is None else [args.num_samples, ]
     # num_samples = [32, 64, 128, 256, *list(range(500, len(dataset)+1, 500))] if args.num_samples is None else [args.num_samples, ]
     # num_samples = [50, 100, 250, 8000]
     # num_samples = [50,]
@@ -104,18 +102,16 @@ def main(cfg):
                 dataset=train_dataset, batch_size=cfg.bs, shuffle=True, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
             )
 
-            if len(train_dataset) < cfg.val_check_interval:
-                cfg.val_check_interval = len(train_dataset)
-
-            # if args.model == 'attmil':
-            #     opt = torch.optim.Adam(m.parameters(), args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=args.wd)
+            # if args.model == 'AttentionMIL':
+            #     cfg.optimopt = torch.optim.Adam(m.parameters(), args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=args.wd)
             #     lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr, epochs=args.num_epochs, steps_per_epoch=len(train_dataloader), pct_start=0.25)
             # else:
             #     opt = torch.optim.AdamW(m.parameters(), args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=args.wd, amsgrad=False)
 
-            num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
-            cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
-            cfg.criterion = "BCEWithLogitsLoss"
+            # class weighting for binary classification
+            if cfg.task == 'binary':
+                num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
+                cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
 
             # --------------------------------------------------------
             # model
@@ -127,11 +123,12 @@ def main(cfg):
             # --------------------------------------------------------
 
             trainer = pl.Trainer(
-                # logger=[logger, csv_logger],
                 accelerator='auto',
+                devices=1,
                 # callbacks=[checkpoint_callback],
                 max_epochs=cfg.num_epochs,
                 # val_check_interval=cfg.val_check_interval,
+                # num_sanity_val_steps=0,
                 check_val_every_n_epoch=None,
                 # limit_val_batches=0.1,  # debug
                 # limit_train_batches=6,  # debug
@@ -142,7 +139,7 @@ def main(cfg):
                 enable_model_summary=False,  # debug
             )
 
-            results_val = trainer.fit(
+            trainer.fit(
                 model,
                 train_dataloader,
             )
