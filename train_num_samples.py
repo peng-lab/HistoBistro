@@ -43,10 +43,10 @@ def main(cfg):
     norm_test = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
 
     # cohorts and targets
-    # cfg.cohorts = ['CPTAC', 'DACHS', 'DUSSEL', 'Epi700', 'ERLANGEN', 'FOXTROT', 'MCO', 'MECC', 'MUNICH', 'QUASAR', 'RAINBOW', 'TCGA', 'TRANSCOT']
-    # cfg.ext_cohorts = ['YCR-BCIP-resections', 'YCR-BCIP-biopsies', 'MAINZ', 'CHINA']
-    cfg.cohorts = ['TCGA']
-    cfg.ext_cohorts = ['TCGA']
+    cfg.cohorts = ['CPTAC', 'DACHS', 'DUSSEL', 'Epi700', 'ERLANGEN', 'FOXTROT', 'MCO', 'MECC', 'MUNICH', 'QUASAR', 'RAINBOW', 'TCGA', 'TRANSCOT']
+    cfg.ext_cohorts = ['YCR-BCIP-resections', 'YCR-BCIP-biopsies', 'MAINZ', 'CHINA']
+    # cfg.cohorts = ['TCGA']
+    # cfg.ext_cohorts = ['TCGA']
     
     data, clini_info = get_multi_cohort_df(
         cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
@@ -54,9 +54,9 @@ def main(cfg):
     cfg.clini_info = clini_info
     cfg.input_dim += len(cfg.clini_info.keys())
 
-    # for cohort in cfg.cohorts:
-    #     if cohort in cfg.ext_cohorts:
-    #         cfg.ext_cohorts.pop(cfg.ext_cohorts.index(cohort))
+    for cohort in cfg.cohorts:
+        if cohort in cfg.ext_cohorts:
+            cfg.ext_cohorts.pop(cfg.ext_cohorts.index(cohort))
 
     train_cohorts = f'{", ".join(cfg.cohorts)}'
     test_cohorts = [train_cohorts, *cfg.ext_cohorts]
@@ -82,10 +82,10 @@ def main(cfg):
     print(f'num training samples in {cfg.cohorts}: {len(data)}')
 
     # start training
-    # num_samples = [64, 128, 256, 512, 1024, 2048, 4096, 8192, len(data)] if args.num_samples is None else [args.num_samples, ]
+    num_samples = [64, 128, 256, 512, 1024, 2048, 4096, 8192, len(data)] if args.num_samples is None else [args.num_samples, ]
     # num_samples = [32, 64, 128, 256, *list(range(500, len(dataset)+1, 500))] if args.num_samples is None else [args.num_samples, ]
     # num_samples = [50, 100, 250, 8000]
-    num_samples = [50,]
+    # num_samples = [50,]
     ext_auc_dict = {key: {n: [] for n in num_samples} for key in cfg.ext_cohorts}
     for n in num_samples:
         for k in range(5):
@@ -124,12 +124,12 @@ def main(cfg):
             # --------------------------------------------------------
             
             logger = WandbLogger(
-            project=cfg.project,
-            name=f'{cfg.logging_name}_fold{k}',
-            save_dir=cfg.save_dir,
-            reinit=True,
-            settings=wandb.Settings(start_method='fork'),
-            mode='offline'
+                project=cfg.project,
+                name=f'{cfg.logging_name}_fold{k}',
+                save_dir=cfg.save_dir,
+                reinit=True,
+                settings=wandb.Settings(start_method='fork'),
+                mode='offline'
             )
                 
             trainer = pl.Trainer(
@@ -190,12 +190,12 @@ def main(cfg):
     print('-------------------------')
     print(f'training for {args.num_epochs} epochs')
     print(f'lists')
-    for ext_cohort in ext_cohorts:
+    for ext_cohort in cfg.ext_cohorts:
         print(ext_cohort)
         for n in num_samples:
             print(f'{n: <4}', ext_auc_dict[ext_cohort][n])
     print('---')
-    for ext_cohort in ext_cohorts:
+    for ext_cohort in cfg.ext_cohorts:
         print(ext_cohort)
         for n in num_samples:
             print(f'{n: <4} {np.mean(np.array(ext_auc_dict[ext_cohort][n])).round(4):.4f}±{np.std(np.array(ext_auc_dict[ext_cohort][n])).round(4):.4f}')
