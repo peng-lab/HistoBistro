@@ -97,18 +97,25 @@ class ClassifierLightning(pl.LightningModule):
         logits = self.model(x, *args)
         return logits
 
-    def configure_optimizers(self):
+    def configure_optimizers(self,):
         optimizer = get_optimizer(
             name=self.config.optimizer,
             model=self.model, 
             lr=self.lr,
-            wd=self.wd
+            wd=self.wd,
         )
-        scheduler = get_scheduler(
-            name=self.config.scheduler,
-            optimizer=optimizer
-        )
-        return [optimizer], [scheduler]
+        if self.config.model == "AttentionMIL":
+            scheduler = get_scheduler(
+                self.config.lr_scheduler,
+                optimizer,
+                self.config.lr,
+                epochs=self.config.num_epochs, 
+                steps_per_epoch=self.config.steps_per_epoch, 
+                pct_start=self.config.pct_start,
+            )
+            return [optimizer], [scheduler]
+        else: 
+            return [optimizer]
 
     def training_step(self, batch, batch_idx):
         x, coords, y, _, _ = batch  # x = features, coords, y = labels, tiles, patient
