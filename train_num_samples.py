@@ -59,8 +59,6 @@ def main(cfg):
             cfg.ext_cohorts.pop(cfg.ext_cohorts.index(cohort))
 
     train_cohorts = f'{", ".join(cfg.cohorts)}'
-    test_cohorts = [train_cohorts, *cfg.ext_cohorts]
-    results = {t: [] for t in test_cohorts}
 
     test_ext_dataloader = []
     for ext in cfg.ext_cohorts:
@@ -158,7 +156,7 @@ def main(cfg):
 
             # test model external cohort
             for idx, ext_cohort in enumerate(cfg.ext_cohorts):
-                print("Testing: ", test_cohorts[idx])
+                print("Testing: ", ext_cohort)
                 # test_cohorts_evaluated.append(test_cohorts[idx])
                 results_test = trainer.test(
                     model,
@@ -177,7 +175,7 @@ def main(cfg):
             # append results to existing results data frame
             if results_csv.is_file():
                 results_df = pd.read_csv(results_csv, dtype=str)
-                if n in results_df["num samples"]:
+                if n in results_df["num samples"].unique():
                     continue
                 else:
                     results_df = results_df.append(new_results)
