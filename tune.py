@@ -1,14 +1,15 @@
+import os
 from pathlib import Path
 import argparse
+import pandas as pd
 import yaml
 
 import pytorch_lightning as pl
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedKFold, train_test_split
 import torch
 from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 import wandb
-
 from options import Options
 from data_utils import MILDataset, get_multi_cohort_df
 from classifier import ClassifierLightning
@@ -16,10 +17,13 @@ from classifier import ClassifierLightning
 import optuna
 from optuna.integration import PyTorchLightningPruningCallback
 
-EPOCHS = 8
 CLIP = 1
-MODEL_DIR = 'home/ubuntu/logs/hyperparameter_tuning'
+MODEL_DIR = 'home/ubuntu/logs/idkidc/hyperparameter_tuning'
 """
+run file with 
+
+python tune.py --config_file config_staging.yaml --num_epochs 10
+
 in case of the following error:
 AttributeError: 'Trainer' object has no attribute 'training_type_plugin'
 caused by version mismatch of optuna and pytorch_lightning
@@ -28,142 +32,176 @@ should_stop = trainer.should_stop
 """
 # TODO make nice and functional, so far tune for lr and wd but without visualizing the results
 
-parser = Options()
-args = parser.parser.parse_args('')
-
-# Load the configuration from the YAML file
-with open(args.config_file, 'r') as f:
-    config = yaml.load(f, Loader=yaml.FullLoader)
-
-# Update the configuration with the values from the argument parser
-for arg_name, arg_value in vars(args).items():
-    if arg_value is not None and arg_name != 'config_file':
-        config[arg_name]['value'] = getattr(args, arg_name)
-
-# Create a flat config file without descriptions
-config = {k: v['value'] for k, v in config.items()}
-
-print('\n--- load options ---')
-for name, value in sorted(config.items()):
-    print(f'{name}: {str(value)}')
-
-cfg = argparse.Namespace(**config)
-
-# setup
-cfg.seed = torch.randint(0, 1000, (1, )).item() if cfg.seed is None else cfg.seed
-pl.seed_everything(cfg.seed, workers=True)
-
-# saving locations
-base_path = Path(cfg.save_dir)  # adapt to own target path
-logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if not cfg.debug else 'debug'
-base_path = base_path / logging_name
-base_path.mkdir(parents=True, exist_ok=True)
-model_path = base_path / 'models'
-fold_path = base_path / 'folds'
-fold_path.mkdir(parents=True, exist_ok=True)
-result_path = base_path / 'results'
-result_path.mkdir(parents=True, exist_ok=True)
-
-norm_val = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
-norm_test = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
-
-# --------------------------------------------------------
-# load data
-# --------------------------------------------------------
-print('\n--- load dataset ---')
-categories = ['Not mut.', 'Mutat.', 'nonMSIH', 'MSIH', 'WT', 'MUT', 'wt', 'MT']
-data = get_multi_cohort_df(cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats)
-
-test_ext_dataloader = []
-for ext in cfg.ext_cohorts:
-    test_data, clini_info = get_multi_cohort_df(
-        cfg.data_config, ext, [cfg.target], cfg.label_dict, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
-    )
-    dataset_ext = MILDataset(
-        test_data,
-        list(range(len(data))), [cfg.target],
-        categories,
-        norm=norm_test,
-        feats=cfg.feats,
-        clini_info=cfg.clini_info
-    )
-    test_ext_dataloader.append(
-        DataLoader(
-            dataset=dataset_ext, batch_size=1, shuffle=False, num_workers=14, pin_memory=True
-        )
-    )
-
-train_cohorts = f'{", ".join(cfg.cohorts)}'
-test_cohorts = [train_cohorts, *cfg.ext_cohorts]
-results = {t: [] for t in test_cohorts}
-
-patient_df = data.groupby('PATIENT').first().reset_index()
-target_stratisfy = cfg.target if type(cfg.target) is str else cfg.target[0]
-train_idxs, val_idxs = train_test_split(
-    range(len(patient_df)), stratify=patient_df[target_stratisfy], random_state=cfg.seed
-)
-
-# training dataset
-train_dataset = MILDataset(
-    data, train_idxs, [cfg.target], num_tiles=cfg.num_tiles, pad_tiles=cfg.pad_tiles, norm=cfg.norm
-)
-train_dataloader = DataLoader(
-    dataset=train_dataset, batch_size=cfg.bs, shuffle=True, num_workers=14, pin_memory=True
-)
-
-# validation dataset
-val_dataset = MILDataset(data, val_idxs, [cfg.target], norm=norm_val)
-val_dataloader = DataLoader(
-    dataset=val_dataset, batch_size=1, shuffle=False, num_workers=14, pin_memory=True
-)
-
-# idx=2 since the ouput is feats, coords, labels
-num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
-cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
-cfg.criterion = "BCEWithLogitsLoss"
-
-# logger = WandbLogger(
-#     project=cfg.project,
-#     name=f'hyperparams_tuning',
-#     save_dir=cfg.save_dir,
-#     reinit=True,
-#     settings=wandb.Settings(start_method='fork'),
-# )
-
 
 def objective(trial: optuna.trial.Trial) -> float:
     # checkpoint_callback = ModelCheckpoint(Path(MODEL_DIR) / f"trial_{trial.number}", monitor="auroc/val")
     torch.cuda.empty_cache()
-
+    
+    # --------------------------------------------------------
+    # choose params
+    # --------------------------------------------------------
+    val_metric = 'acc/val'
     lr = trial.suggest_float("learning_rate", 1e-6, 1e-1)
     wd = trial.suggest_float("weight_decay", 1e-6, 1e-1)
-
-    model = ClassifierLightning(cfg)
-    logger = WandbLogger(
-        project=cfg.project,
-        name=f'hyperparams_tuning_{trial.number}',
-        save_dir=cfg.save_dir,
-        reinit=True,
-        settings=wandb.Settings(start_method='fork'),
-        offline=True,
+    # optimizer = trial.suggest_categorical("optimizer", ["AdamW", "Adam", "SGD"])
+    # lr_scheduler = trial.suggest_categorical("lr_scheduler", ["StepLR", "CosineAnnealingLR", "ReduceLROnPlateau", "OneCycleLR"])
+    heads = trial.suggest_categorical("heads", [4, 8, 12])
+    dim_head = trial.suggest_categorical("dim_heads", [32, 64, 128])
+    
+    # --------------------------------------------------------
+    # load data
+    # --------------------------------------------------------
+    print('\n--- load dataset ---')
+    data, clini_info = get_multi_cohort_df(
+        cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
     )
+    cfg.clini_info = clini_info
+    cfg.input_dim += len(cfg.clini_info.keys())
 
-    trainer = pl.Trainer(
-        logger=logger,
-        precision='16-mixed',
-        accelerator='auto',
-        max_epochs=EPOCHS,
-        gradient_clip_val=CLIP,
-        enable_model_summary=False,
-        callbacks=[PyTorchLightningPruningCallback(trial, monitor="auroc/val")],
-    )
-    hyperparameters = dict(lr=lr, wd=wd)
-    trainer.logger.log_hyperparams(hyperparameters)
-    trainer.fit(model, train_dataloader, val_dataloader)
-    return trainer.callback_metrics["auroc/val"].detach().item()
+    train_cohorts = f'{", ".join(cfg.cohorts)}'
+    # --------------------------------------------------------
+    # k-fold cross validation
+    # --------------------------------------------------------
+    # load fold directory from data_config
+    with open(cfg.data_config, 'r') as f:
+        data_config = yaml.safe_load(f)
+        fold_path = Path(data_config[train_cohorts]['folds']) / f"{cfg.target}_{cfg.folds}folds"
+        fold_path.mkdir(parents=True, exist_ok=True)
+        
+    # split data stratified by the labels
+    skf = StratifiedKFold(n_splits=cfg.folds, shuffle=True, random_state=cfg.seed)
+    patient_df = data.groupby('PATIENT').first().reset_index()
+    target_stratisfy = cfg.target if type(cfg.target) is str else cfg.target[0]
+    splits = skf.split(patient_df, patient_df[target_stratisfy])
+    splits = list(splits)
+
+    val_metric_folds = []
+    # training dataset
+    for k in range(cfg.folds):
+        # read split from csv-file if exists already else save split to csv
+        if Path(fold_path / f'fold{k}_train.csv').exists():
+            train_idxs = pd.read_csv(fold_path / f'fold{k}_train.csv', index_col='Unnamed: 0').index
+            val_idxs = pd.read_csv(fold_path / f'fold{k}_val.csv', index_col='Unnamed: 0').index
+        else:
+            train_idxs, val_idxs = train_test_split(splits[k][0], stratify=patient_df.iloc[splits[k][0]][target_stratisfy], random_state=cfg.seed)
+            patient_df['PATIENT'][train_idxs].to_csv(fold_path / f'fold{k}_train.csv')
+            patient_df['PATIENT'][val_idxs].to_csv(fold_path / f'fold{k}_val.csv')
+            patient_df['PATIENT'][splits[k][1]].to_csv(fold_path / f'fold{k}_test.csv')
+
+        # training dataset
+        train_dataset = MILDataset(
+            data,
+            train_idxs, [cfg.target],
+            num_tiles=cfg.num_tiles,
+            pad_tiles=cfg.pad_tiles,
+            norm=cfg.norm,
+            clini_info=cfg.clini_info
+        )
+        print(f'num training samples in fold {k}: {len(train_dataset)}')
+        train_dataloader = DataLoader(
+            dataset=train_dataset, batch_size=cfg.bs, shuffle=True, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
+        )
+        if len(train_dataset) < cfg.val_check_interval:
+            cfg.val_check_interval = len(train_dataset)
+        
+        # validation dataset
+        norm_val = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
+        val_dataset = MILDataset(data, val_idxs, [cfg.target], num_tiles=cfg.num_tiles, pad_tiles=cfg.pad_tiles, norm=norm_val, clini_info=cfg.clini_info)
+        print(f'num validation samples in fold {k}: {len(val_dataset)}')
+        val_dataloader = DataLoader(
+            dataset=val_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
+        )
+        
+        # class weighting for binary classification
+        if cfg.task == 'binary':
+            num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
+            cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
+            
+        # --------------------------------------------------------
+        # model
+        # --------------------------------------------------------
+        cfg.lr = lr
+        cfg.wd = wd
+        # cfg.optimizer = optimizer
+        # cfg.lr_scheduler = lr_scheduler
+        cfg.heads = heads
+        cfg.dim_head = dim_head
+        cfg.dim = heads * dim_head
+        cfg.mlp_dim = heads * dim_head
+        model = ClassifierLightning(cfg)
+        
+        # --------------------------------------------------------
+        # logging
+        # --------------------------------------------------------
+
+        # logging
+        config = dict(trial.params)
+        config["trial.number"] = trial.number
+        logger = WandbLogger(
+            project=cfg.project,
+            group=f'hyperparams_tuning',
+            name=f'hyperparams_tuning_{trial.number}_{k}',
+            save_dir=cfg.save_dir,
+            config=config,
+            reinit=True,
+            settings=wandb.Settings(start_method='fork'),
+        )
+
+        trainer = pl.Trainer(
+            logger=logger,
+            precision='16-mixed',
+            accelerator='auto',
+            devices=1,
+            max_epochs=cfg.num_epochs,
+            gradient_clip_val=CLIP,
+            enable_model_summary=False,
+            callbacks=[PyTorchLightningPruningCallback(trial, monitor=val_metric)],
+        )
+        
+        hyperparameters = dict(
+            lr=lr, 
+            wd=wd, 
+            # optimizer=optimizer, 
+            # lr_scheduler=lr_scheduler,
+            heads=heads, 
+            dim_heads=dim_head
+        )
+        trainer.logger.log_hyperparams(hyperparameters)
+        trainer.fit(model, train_dataloader, val_dataloader)
+        
+        val_metric_folds.append(trainer.callback_metrics[val_metric].detach().item())
+    
+    # return trainer.callback_metrics["acc/val"].detach().item()
+    return sum(val_metric_folds) / len(val_metric_folds)
 
 
 if __name__ == "__main__":
+    parser = Options()
+    args = parser.parse()
+    
+    # Load the configuration from the YAML file
+    with open(args.config_file, 'r') as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+
+    # Update the configuration with the values from the argument parser
+    for arg_name, arg_value in vars(args).items():
+        if arg_value is not None and arg_name != 'config_file':
+            config[arg_name]['value'] = getattr(args, arg_name)
+
+    # Create a flat config file without descriptions
+    config = {k: v['value'] for k, v in config.items()}
+
+    print('\n--- load options ---')
+    for name, value in sorted(config.items()):
+        print(f'{name}: {str(value)}')
+
+    global cfg
+    cfg = argparse.Namespace(**config)
+    
+    # --------------------------------------------------------
+    # set up paths
+    # --------------------------------------------------------
+    
     sampler = optuna.samplers.TPESampler(multivariate=True)
     pruner = optuna.pruners.HyperbandPruner()
     study = optuna.create_study(direction="maximize", sampler=sampler, pruner=pruner)
