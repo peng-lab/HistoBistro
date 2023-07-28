@@ -252,11 +252,6 @@ class MILDataset(Dataset):
         except TypeError or KeyError:
             coords = 0  # NoneType is not accepted by dataloader
 
-        # avoid CUDA OOM
-        if features.shape[0] > 10000:
-            feat_idxs = torch.randperm(features.shape[0])[:10000]
-            features = features[feat_idxs]
-
         # randomly sample num_tiles tiles, if #tiles < num_tiles, fill vector with 0s 
         tiles = torch.tensor([features.shape[0]])  # only needed for AttentionMIL implementation
         if self.num_tiles > 0:

@@ -11,7 +11,7 @@ import torch
 import wandb
 import yaml
 from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import CSVLogger, WandbLogger
+from pytorch_lightning.loggers import WandbLogger
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
@@ -45,9 +45,9 @@ def main(cfg):
     # cohorts and targets
     cfg.cohorts = ['CPTAC', 'DACHS', 'DUSSEL', 'Epi700', 'ERLANGEN', 'FOXTROT', 'MCO', 'MECC', 'MUNICH', 'QUASAR', 'RAINBOW', 'TCGA', 'TRANSCOT']
     cfg.ext_cohorts = ['YCR-BCIP-resections', 'YCR-BCIP-biopsies', 'MAINZ', 'CHINA']
+    # cfg.cohorts = ['TCGA']
+    # cfg.ext_cohorts = ['TCGA']
     
-    categories = ['Not mut.', 'Mutat.', 'nonMSIH', 'MSIH', 'WT', 'MUT', 'wt', 'MT']
-
     data, clini_info = get_multi_cohort_df(
         cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
     )
@@ -59,20 +59,17 @@ def main(cfg):
             cfg.ext_cohorts.pop(cfg.ext_cohorts.index(cohort))
 
     train_cohorts = f'{", ".join(cfg.cohorts)}'
-    test_cohorts = [train_cohorts, *cfg.ext_cohorts]
-    results = {t: [] for t in test_cohorts}
 
     test_ext_dataloader = []
     for ext in cfg.ext_cohorts:
         test_data, clini_info = get_multi_cohort_df(
-            cfg.data_config, ext, [cfg.target], cfg.label_dict, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
+            cfg.data_config, [ext], [cfg.target], cfg.label_dict, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
         )
         dataset_ext = MILDataset(
             test_data,
-            list(range(len(data))), [cfg.target],
-            categories,
+            list(range(len(test_data))), 
+            [cfg.target],
             norm=norm_test,
-            feats=cfg.feats,
             clini_info=cfg.clini_info
         )
         test_ext_dataloader.append(DataLoader(dataset=dataset_ext, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True))
@@ -83,7 +80,7 @@ def main(cfg):
     print(f'num training samples in {cfg.cohorts}: {len(data)}')
 
     # start training
-    num_samples = [62, 128, 256, 512, 1024, 2048, 4096, 8192, len(data)] if args.num_samples is None else [args.num_samples, ]
+    num_samples = [64, 128, 256, 512, 1024, 2048, 4096, 8192, len(data)] if args.num_samples is None else [args.num_samples, ]
     # num_samples = [32, 64, 128, 256, *list(range(500, len(dataset)+1, 500))] if args.num_samples is None else [args.num_samples, ]
     # num_samples = [50, 100, 250, 8000]
     # num_samples = [50,]
@@ -104,18 +101,16 @@ def main(cfg):
                 dataset=train_dataset, batch_size=cfg.bs, shuffle=True, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
             )
 
-            if len(train_dataset) < cfg.val_check_interval:
-                cfg.val_check_interval = len(train_dataset)
+            if cfg.model == 'AttentionMIL':
+                cfg.optim = "Adam"
+                cfg.lr_scheduler = "OneCycleLR"
+                cfg.steps_per_epoch = len(train_dataloader)
+                cfg.pct_start = 0.25
 
-            # if args.model == 'attmil':
-            #     opt = torch.optim.Adam(m.parameters(), args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=args.wd)
-            #     lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr, epochs=args.num_epochs, steps_per_epoch=len(train_dataloader), pct_start=0.25)
-            # else:
-            #     opt = torch.optim.AdamW(m.parameters(), args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=args.wd, amsgrad=False)
-
-            num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
-            cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
-            cfg.criterion = "BCEWithLogitsLoss"
+            # class weighting for binary classification
+            if cfg.task == 'binary':
+                num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
+                cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
 
             # --------------------------------------------------------
             # model
@@ -125,13 +120,23 @@ def main(cfg):
             # --------------------------------------------------------
             # model saving
             # --------------------------------------------------------
-
+            
+            logger = WandbLogger(
+                project=cfg.project,
+                name=f'{cfg.logging_name}_fold{k}',
+                save_dir=cfg.save_dir,
+                reinit=True,
+                settings=wandb.Settings(start_method='fork'),
+                mode='offline'
+            )
+                
             trainer = pl.Trainer(
-                # logger=[logger, csv_logger],
                 accelerator='auto',
+                devices=1,
                 # callbacks=[checkpoint_callback],
                 max_epochs=cfg.num_epochs,
                 # val_check_interval=cfg.val_check_interval,
+                # num_sanity_val_steps=0,
                 check_val_every_n_epoch=None,
                 # limit_val_batches=0.1,  # debug
                 # limit_train_batches=6,  # debug
@@ -142,7 +147,7 @@ def main(cfg):
                 enable_model_summary=False,  # debug
             )
 
-            results_val = trainer.fit(
+            trainer.fit(
                 model,
                 train_dataloader,
             )
@@ -151,7 +156,7 @@ def main(cfg):
 
             # test model external cohort
             for idx, ext_cohort in enumerate(cfg.ext_cohorts):
-                print("Testing: ", test_cohorts[idx])
+                print("Testing: ", ext_cohort)
                 # test_cohorts_evaluated.append(test_cohorts[idx])
                 results_test = trainer.test(
                     model,
@@ -170,7 +175,7 @@ def main(cfg):
             # append results to existing results data frame
             if results_csv.is_file():
                 results_df = pd.read_csv(results_csv, dtype=str)
-                if n in results_df["num samples"]:
+                if n in results_df["num samples"].unique():
                     continue
                 else:
                     results_df = results_df.append(new_results)
@@ -183,12 +188,12 @@ def main(cfg):
     print('-------------------------')
     print(f'training for {args.num_epochs} epochs')
     print(f'lists')
-    for ext_cohort in ext_cohorts:
+    for ext_cohort in cfg.ext_cohorts:
         print(ext_cohort)
         for n in num_samples:
             print(f'{n: <4}', ext_auc_dict[ext_cohort][n])
     print('---')
-    for ext_cohort in ext_cohorts:
+    for ext_cohort in cfg.ext_cohorts:
         print(ext_cohort)
         for n in num_samples:
             print(f'{n: <4} {np.mean(np.array(ext_auc_dict[ext_cohort][n])).round(4):.4f}±{np.std(np.array(ext_auc_dict[ext_cohort][n])).round(4):.4f}')

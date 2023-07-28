@@ -22,6 +22,7 @@ class Options:
         
         # model options
         self.parser.add_argument('--model', type=str, help='costum prefix for logging')
+        self.parser.add_argument('--pos_enc', type=str, help='which positional encoding to use')
         self.parser.add_argument('--norm', type=str, help='type of pre-processing')
         self.parser.add_argument('--feats', type=str, help='type of features')
         self.parser.add_argument('--input_dim', type=int, help='dimension of features')
