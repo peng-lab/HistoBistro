@@ -122,9 +122,11 @@ class ClassifierLightning(pl.LightningModule):
         logits = self.forward(x, coords)
         if self.config.task == "binary":
             loss = self.criterion(logits, y.unsqueeze(0).float()) 
+            probs = torch.sigmoid(logits)
+            preds = torch.round(probs)
         else:           
             loss = self.criterion(logits, y)            
-        preds = torch.argmax(logits, dim=1, keepdim=True)
+            preds = torch.argmax(logits, dim=1, keepdim=True)
         # self.lr_schedulers().step()
 
         if self.config.task == "binary":
@@ -142,10 +144,17 @@ class ClassifierLightning(pl.LightningModule):
         logits = self.forward(x, coords)
         # if config.task == "multiclass":
         #     y = y.squeeze(-1)
-        loss = self.criterion(logits, y)
+        # loss = self.criterion(logits, y)
+        if self.config.task == "binary":
+            loss = self.criterion(logits, y.unsqueeze(0).float())
+            probs = torch.sigmoid(logits)
+            preds = torch.round(probs)
+        else:           
+            loss = self.criterion(logits, y)            
+            preds = torch.argmax(logits, dim=1, keepdim=True)
         # probs = torch.sigmoid(logits)
-        probs = torch.softmax(logits, dim=1)
-        preds = torch.argmax(probs, dim=1, keepdim=True)
+        # probs = torch.softmax(logits, dim=1)
+        # preds = torch.argmax(probs, dim=1, keepdim=True)
         
         self.acc_val(probs, y)  # preds
         self.auroc_val(probs, y)
@@ -186,13 +195,17 @@ class ClassifierLightning(pl.LightningModule):
     def test_step(self, batch, batch_idx, dataloader_idx=0):
         x, coords, y, _, patient = batch  # x = features, coords, y = labels, tiles, patient
         logits = self.forward(x, coords)
+
         if self.config.task == "binary":
-            loss = self.criterion(logits, y.unsqueeze(0).float()) 
+            loss = self.criterion(logits, y.unsqueeze(0).float())
+            probs = torch.sigmoid(logits)
+            preds = torch.round(probs)
         else:           
-            loss = self.criterion(logits, y)      
+            loss = self.criterion(logits, y)            
+            preds = torch.argmax(logits, dim=1, keepdim=True)   
         # probs = torch.sigmoid(logits)
-        probs = torch.softmax(logits, dim=1)
-        preds = torch.argmax(probs, dim=1, keepdim=True)
+        # probs = torch.softmax(logits, dim=1)
+        # preds = torch.argmax(probs, dim=1, keepdim=True)
         
         if self.config.task == "binary":
             y = y.unsqueeze(1)
