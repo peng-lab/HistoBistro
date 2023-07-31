@@ -41,6 +41,10 @@ warnings.filterwarnings("ignore", category=UserWarning)
 def main(cfg):
     cfg.seed = torch.randint(0, 1000, (1, )).item() if cfg.seed is None else cfg.seed
     pl.seed_everything(cfg.seed, workers=True)
+    
+    # --------------------------------------------------------
+    # set up paths
+    # --------------------------------------------------------
 
     # saving locations
     base_path = Path(cfg.save_dir)  # adapt to own target path
@@ -66,7 +70,6 @@ def main(cfg):
     train_cohorts = f'{", ".join(cfg.cohorts)}'
     val_cohorts = [train_cohorts]
     results_validation = {t: [] for t in val_cohorts}
-
     
     # --------------------------------------------------------
     # k-fold cross validation
@@ -110,9 +113,11 @@ def main(cfg):
         )
         if len(train_dataset) < cfg.val_check_interval:
             cfg.val_check_interval = len(train_dataset)
+        if cfg.lr_scheduler == 'OneCycleLR':
+            cfg.lr_scheduler_config['total_steps'] = cfg.num_epochs * len(train_dataloader)
         
         # validation dataset
-        val_dataset = MILDataset(data, val_idxs, [cfg.target], num_tiles=cfg.num_tiles, norm=norm_val, clini_info=cfg.clini_info)
+        val_dataset = MILDataset(data, val_idxs, [cfg.target], num_tiles=cfg.num_tiles, pad_tiles=cfg.pad_tiles, norm=norm_val, clini_info=cfg.clini_info)
         print(f'num validation samples in fold {k}: {len(val_dataset)}')
         val_dataloader = DataLoader(
             dataset=val_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
@@ -137,7 +142,7 @@ def main(cfg):
             save_dir=cfg.save_dir,
             reinit=True,
             settings=wandb.Settings(start_method='fork'),
-            mode='offline'
+            mode='online'
         )
 
         csv_logger = CSVLogger(
