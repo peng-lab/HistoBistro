@@ -117,7 +117,7 @@ def main(cfg):
             cfg.lr_scheduler_config['total_steps'] = cfg.num_epochs * len(train_dataloader)
         
         # validation dataset
-        val_dataset = MILDataset(data, val_idxs, [cfg.target], num_tiles=cfg.num_tiles, pad_tiles=cfg.pad_tiles, norm=norm_val, clini_info=cfg.clini_info)
+        val_dataset = MILDataset(data, val_idxs, [cfg.target], norm=norm_val, clini_info=cfg.clini_info)
         print(f'num validation samples in fold {k}: {len(val_dataset)}')
         val_dataloader = DataLoader(
             dataset=val_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
