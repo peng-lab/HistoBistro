@@ -99,9 +99,9 @@ FOXTROT:
     macenko:
       ctranspath: /lustre/groups/peng/datasets/histology_data/FOXTROT/features/Macenko/FOXTROT-CRC-DX_macenko_ctranspath/
     histaugan: 
-      ctranspath: /lustre/groups/peng/datasets/histology_data/FOXTROT/features/FOXTROT-CRC-DX-features-histaugan/
+      ctranspath: /lustre/groups/peng/datasets/histology_data/FOXTROT/features/histaugan/
     raw: 
-      ctranspath: /lustre/groups/peng/datasets/histology_data/FOXTROT/features/FOXTROT-CRC-DX-features-histaugan/
+      ctranspath: /lustre/groups/peng/datasets/histology_data/FOXTROT/features/histaugan/
 
 MAINZ:
   targets:
@@ -218,6 +218,7 @@ TCGA:
       ctranspath: /lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/marugoto_histaugan/
     efficient_histaugan:
       ctranspath: /lustre/groups/peng/datasets/histology_data/TCGA-CRC/features/marugoto_efficient_histaugan/
+  folds: /lustre/groups/peng/datasets/histology_data/TCGA-CRC/folds
 
 TRANSCOT:
   targets:
@@ -227,10 +228,10 @@ TRANSCOT:
   feature_dir:
     macenko:
       ctranspath: /lustre/groups/peng/datasets/histology_data/TRANSCOT/features/Macenko/TRANSCOT-CRC-DX_macenko_ctranspath/
-    raw:  # careful: still macenko!
-      ctranspath: /lustre/groups/peng/datasets/histology_data/TRANSCOT/features/Macenko/TRANSCOT-CRC-DX_macenko_ctranspath/
-    histaugan:  # careful: still macenko!
-      ctranspath: /lustre/groups/peng/datasets/histology_data/TRANSCOT/features/Macenko/TRANSCOT-CRC-DX_macenko_ctranspath/
+    raw:  
+      ctranspath: /lustre/groups/peng/datasets/histology_data/TRANSCOT/features/histaugan
+    histaugan: 
+      ctranspath: /lustre/groups/peng/datasets/histology_data/TRANSCOT/features/histaugan
 
 YCR-BCIP-biopsies:
   targets:
