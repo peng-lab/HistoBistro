@@ -47,7 +47,7 @@ def main(cfg):
     # --------------------------------------------------------
 
     # saving locations
-    base_path = Path(cfg.save_dir)  # adapt to own target path
+    base_path = Path(cfg.save_dir)
     cfg.logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if cfg.name != 'debug' else 'debug'
     base_path = base_path / cfg.logging_name
     base_path.mkdir(parents=True, exist_ok=True)
@@ -168,13 +168,12 @@ def main(cfg):
         trainer = pl.Trainer(
             logger=[logger, csv_logger],
             accelerator='auto',
-            # TODO enable multiple gpu training with splitting (only one process), maybe with strategy='ddp_spawn' and pickling
             devices=1,
             callbacks=[checkpoint_callback],
             max_epochs=cfg.num_epochs,
-            val_check_interval=cfg.val_check_interval, # // torch.cuda.device_count(),
+            val_check_interval=cfg.val_check_interval,
             check_val_every_n_epoch=None,
-            enable_model_summary=False,  # debug
+            enable_model_summary=False,
         )
         
         # --------------------------------------------------------
