@@ -12,7 +12,7 @@ from pytorch_lightning.loggers import WandbLogger
 from torch.utils.data import DataLoader
 import wandb
 from options import Options
-from data_utils import MILDataset, get_multi_cohort_df
+from data import MILDataset, get_multi_cohort_df
 from classifier import ClassifierLightning
 
 import optuna

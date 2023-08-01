@@ -16,7 +16,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
 from classifier import ClassifierLightning
-from data_utils import MILDataset, get_multi_cohort_df
+from data import MILDataset, get_multi_cohort_df
 from options import Options
 from utils import save_results
 

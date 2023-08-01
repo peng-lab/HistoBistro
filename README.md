@@ -22,7 +22,7 @@ Training script for multiple instance learning with various aggregation models. 
 │   │   ├── networks.py  
 ├── classifier.py                   # lightning module for feature classification
 ├── config.yaml                     # config file for training arguments
-├── data_utils.py
+├── data.py
 ├── environment.yaml                # config file for conda environment
 ├── Hackathon.ipynb                 # notebook for running the code in google colab
 ├── main.py                         # train and test models -- should be split up
