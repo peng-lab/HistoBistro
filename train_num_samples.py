@@ -29,7 +29,7 @@ def main(cfg):
     pl.seed_everything(cfg.seed, workers=True)
 
     # saving locations
-    base_path = Path(cfg.save_dir)  # adapt to own target path
+    base_path = Path(cfg.save_dir)  
     cfg.logging_name = f'num_samples_{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if not cfg.debug else 'debug'
     base_path = base_path / cfg.logging_name
     base_path.mkdir(parents=True, exist_ok=True)
@@ -43,10 +43,12 @@ def main(cfg):
     norm_test = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
 
     # cohorts and targets
-    cfg.cohorts = ['CPTAC', 'DACHS', 'DUSSEL', 'Epi700', 'ERLANGEN', 'FOXTROT', 'MCO', 'MECC', 'MUNICH', 'QUASAR', 'RAINBOW', 'TCGA', 'TRANSCOT']
-    cfg.ext_cohorts = ['YCR-BCIP-resections', 'YCR-BCIP-biopsies', 'MAINZ', 'CHINA']
-    # cfg.cohorts = ['TCGA']
-    # cfg.ext_cohorts = ['TCGA']
+    # --- for MSI cohorts
+    # cfg.cohorts = ['CPTAC', 'DACHS', 'DUSSEL', 'Epi700', 'ERLANGEN', 'FOXTROT', 'MCO', 'MECC', 'MUNICH', 'QUASAR', 'RAINBOW', 'TCGA', 'TRANSCOT']
+    # cfg.ext_cohorts = ['YCR-BCIP-resections', 'YCR-BCIP-biopsies', 'MAINZ', 'CHINA']
+    # --- for BRAF / KRAS cohorts
+    cfg.cohorts = ['DACHS', 'MCO', 'QUASAR', 'RAINBOW', 'TCGA']
+    cfg.ext_cohorts = ['Epi700']
     
     data, clini_info = get_multi_cohort_df(
         cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
@@ -81,9 +83,7 @@ def main(cfg):
 
     # start training
     num_samples = [64, 128, 256, 512, 1024, 2048, 4096, 8192, len(data)] if args.num_samples is None else [args.num_samples, ]
-    # num_samples = [32, 64, 128, 256, *list(range(500, len(dataset)+1, 500))] if args.num_samples is None else [args.num_samples, ]
-    # num_samples = [50, 100, 250, 8000]
-    # num_samples = [50,]
+
     ext_auc_dict = {key: {n: [] for n in num_samples} for key in cfg.ext_cohorts}
     for n in num_samples:
         for k in range(5):
@@ -133,18 +133,9 @@ def main(cfg):
             trainer = pl.Trainer(
                 accelerator='auto',
                 devices=1,
-                # callbacks=[checkpoint_callback],
                 max_epochs=cfg.num_epochs,
-                # val_check_interval=cfg.val_check_interval,
-                # num_sanity_val_steps=0,
                 check_val_every_n_epoch=None,
-                # limit_val_batches=0.1,  # debug
-                # limit_train_batches=6,  # debug
-                # limit_val_batches=6,    # debug
-                # log_every_n_steps=1,  # debug
-                # fast_dev_run=True,    # debug
-                # max_steps=6,          # debug
-                enable_model_summary=False,  # debug
+                enable_model_summary=False,
             )
 
             trainer.fit(
@@ -157,18 +148,15 @@ def main(cfg):
             # test model external cohort
             for idx, ext_cohort in enumerate(cfg.ext_cohorts):
                 print("Testing: ", ext_cohort)
-                # test_cohorts_evaluated.append(test_cohorts[idx])
                 results_test = trainer.test(
                     model,
                     test_ext_dataloader[idx],
-                    # ckpt_path='best',
                 )
-
                 ext_auc_dict[ext_cohort][n].append(results_test[0]['auroc/test'])
     
         # save results in data frame 
         for ext_cohort in cfg.ext_cohorts:
-            results_csv = result_path / f'results_num_samples_{ext_cohort}_{cfg.model}_{cfg.feats}.csv'
+            results_csv = base_path / f'results_num_samples_{ext_cohort}_{cfg.model}_{cfg.feats}.csv'
             columns = ["num samples"] + [f'fold {i}' for i in range(5)]
             new_results = pd.DataFrame(data=np.array([[n, *ext_auc_dict[ext_cohort][n]]]), columns=columns)
 
