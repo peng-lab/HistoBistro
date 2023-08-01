@@ -48,7 +48,7 @@ def main(cfg):
 
     # saving locations
     base_path = Path(cfg.save_dir)  # adapt to own target path
-    cfg.logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if not cfg.debug else 'debug'
+    cfg.logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if cfg.name != 'debug' else 'debug'
     base_path = base_path / cfg.logging_name
     base_path.mkdir(parents=True, exist_ok=True)
     model_path = base_path / 'models'
@@ -174,13 +174,6 @@ def main(cfg):
             max_epochs=cfg.num_epochs,
             val_check_interval=cfg.val_check_interval, # // torch.cuda.device_count(),
             check_val_every_n_epoch=None,
-            # limit_val_batches=0.1,  # debug
-            # limit_train_batches=6,  # debug
-            # limit_val_batches=6,    # debug
-            # limit_test_batches=10,
-            # log_every_n_steps=1,  # debug
-            # fast_dev_run=True,    # debug
-            # max_steps=6,          # debug
             enable_model_summary=False,  # debug
         )
         
@@ -195,7 +188,6 @@ def main(cfg):
                 model,
                 train_dataloader,
                 val_dataloader,
-                ckpt_path=cfg.resume,
             )
             logger.log_table('results/val', results_val)
         
@@ -209,9 +201,6 @@ def main(cfg):
             ckpt_path='best',
         )
         results_validation[val_cohorts[0]].append(results_val_final[0])
-        
-        # save patient predictions to outputs csv file
-        # model.outputs.to_csv(result_path / f'fold{k}' / f'outputs_val_{val_cohorts}.csv')
             
         wandb.finish()  # required for new wandb run in next fold
             
@@ -229,10 +218,7 @@ if __name__ == '__main__':
     # Update the configuration with the values from the argument parser
     for arg_name, arg_value in vars(args).items():
         if arg_value is not None and arg_name != 'config_file':
-            config[arg_name]['value'] = getattr(args, arg_name)
-    
-    # Create a flat config file without descriptions
-    config = {k: v['value'] for k, v in config.items()}
+            config[arg_name] = getattr(args, arg_name)
 
     print('\n--- load options ---')
     for name, value in sorted(config.items()):
