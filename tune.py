@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import argparse
+import warnings
 import pandas as pd
 import yaml
 
@@ -17,8 +18,6 @@ from classifier import ClassifierLightning
 import optuna
 from optuna.integration import PyTorchLightningPruningCallback
 
-CLIP = 1
-MODEL_DIR = 'home/ubuntu/logs/idkidc/hyperparameter_tuning'
 """
 run file with 
 
@@ -32,6 +31,8 @@ should_stop = trainer.should_stop
 """
 # TODO make nice and functional, so far tune for lr and wd but without visualizing the results
 
+# filter out UserWarnings from the torchmetrics package
+warnings.filterwarnings("ignore", category=UserWarning)
 
 def objective(trial: optuna.trial.Trial) -> float:
     # checkpoint_callback = ModelCheckpoint(Path(MODEL_DIR) / f"trial_{trial.number}", monitor="auroc/val")
@@ -41,8 +42,8 @@ def objective(trial: optuna.trial.Trial) -> float:
     # choose params
     # --------------------------------------------------------
     val_metric = 'acc/val'
-    lr = trial.suggest_float("learning_rate", 1e-6, 1e-1)
-    wd = trial.suggest_float("weight_decay", 1e-6, 1e-1)
+    lr = trial.suggest_float("learning_rate", 1e-6, 1e-2)
+    wd = trial.suggest_float("weight_decay", 1e-6, 1e-2)
     # optimizer = trial.suggest_categorical("optimizer", ["AdamW", "Adam", "SGD"])
     # lr_scheduler = trial.suggest_categorical("lr_scheduler", ["StepLR", "CosineAnnealingLR", "ReduceLROnPlateau", "OneCycleLR"])
     heads = trial.suggest_categorical("heads", [4, 8, 12])
@@ -139,8 +140,8 @@ def objective(trial: optuna.trial.Trial) -> float:
         config["trial.number"] = trial.number
         logger = WandbLogger(
             project=cfg.project,
-            group=f'hyperparams_tuning',
-            name=f'hyperparams_tuning_{trial.number}_{k}',
+            group=f'tune_{cfg.name}',
+            name=f'{trial.number}_{k}',
             save_dir=cfg.save_dir,
             config=config,
             reinit=True,
@@ -153,7 +154,7 @@ def objective(trial: optuna.trial.Trial) -> float:
             accelerator='auto',
             devices=1,
             max_epochs=cfg.num_epochs,
-            gradient_clip_val=CLIP,
+            gradient_clip_val=1,
             enable_model_summary=False,
             callbacks=[PyTorchLightningPruningCallback(trial, monitor=val_metric)],
         )
@@ -170,6 +171,8 @@ def objective(trial: optuna.trial.Trial) -> float:
         trainer.fit(model, train_dataloader, val_dataloader)
         
         val_metric_folds.append(trainer.callback_metrics[val_metric].detach().item())
+        wandb.finish()  # required for new wandb run in next fold
+
     
     # return trainer.callback_metrics["acc/val"].detach().item()
     return sum(val_metric_folds) / len(val_metric_folds)
@@ -213,3 +216,9 @@ if __name__ == "__main__":
     print("  Params: ")
     for key, value in trial.params.items():
         print("    {}: {}".format(key, value))
+        
+    wandb.init(project=cfg.project, group=f'tune_{cfg.name}', name=f'final')
+    hist = optuna.visualization.plot_optimization_history(study)
+    wandb.log({"optuna/plot_optimization_history": hist})
+    imp = optuna.visualization.plot_param_importances(study)
+    wandb.log({"optuna/plot_param_importances": imp})

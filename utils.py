@@ -59,13 +59,13 @@ def get_optimizer(name, model, lr=0.01, wd=0.1):
         raise ValueError(f"Invalid optimizer name: {name}")
 
 
-def get_scheduler(name, optimizer, **kwargs):
+def get_scheduler(name, optimizer, *args, **kwargs):
     # Check if the name is a valid scheduler name
     if name in lr_scheduler.__dict__:
         # Get the scheduler class from the torch.optim.lr_scheduler module
         scheduler_class = getattr(lr_scheduler, name)
         # Instantiate the scheduler with the optimizer and other keyword arguments
-        scheduler = scheduler_class(optimizer, **kwargs)
+        scheduler = scheduler_class(optimizer, *args, **kwargs)
         # Return the scheduler
         return scheduler
     else:

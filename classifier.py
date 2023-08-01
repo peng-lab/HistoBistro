@@ -1,16 +1,12 @@
-from pathlib import Path
 from matplotlib import pyplot as plt
 import pandas as pd
 import seaborn as sns
 import torch
 import torchmetrics
 import pytorch_lightning as pl
-from torch.nn import functional as F
 import wandb
 
 from utils import get_model, get_loss, get_optimizer, get_scheduler
-from models.aggregators.transformer import Transformer
-from models.aggregators.attentionmil import AttentionMIL
 
 
 class ClassifierLightning(pl.LightningModule):
@@ -22,14 +18,8 @@ class ClassifierLightning(pl.LightningModule):
             num_classes=self.config.num_classes, 
             input_dim=config.input_dim, 
             **self.config.model_config,
-            # heads=config.model_config['heads'],
-            # dim_head=config.model_config['dim_head'],
-            # dim=config.model_config['dim'], 
-            # mlp_dim=config.model_config['mlp_dim'],
-            # pos_enc=config.model_config['pos_enc']
         )
         self.criterion = get_loss(config.criterion, pos_weight=config.pos_weight) if config.task == "binary" else get_loss(config.criterion)
-        # TODO save config file correctly (with self.save_hyperparameters?)
         self.save_hyperparameters()
         
         self.lr = config.lr
@@ -133,7 +123,6 @@ class ClassifierLightning(pl.LightningModule):
         else:           
             loss = self.criterion(logits, y)            
             preds = torch.argmax(logits, dim=1, keepdim=True)
-        # self.lr_schedulers().step()
 
         if self.config.task == "binary":
             self.acc_train(preds, y.unsqueeze(1))
@@ -148,21 +137,15 @@ class ClassifierLightning(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         x, coords, y, _, _ = batch  # x = features, coords, y = labels, tiles, patient
         logits = self.forward(x, coords)
-        # if config.task == "multiclass":
-        #     y = y.squeeze(-1)
-        # loss = self.criterion(logits, y)
         if self.config.task == "binary":
-            loss = self.criterion(logits, y.unsqueeze(0).float())
+            y = y.unsqueeze(1)
+            loss = self.criterion(logits, y.float())
             probs = torch.sigmoid(logits)
-            preds = torch.round(probs)
         else:           
-            loss = self.criterion(logits, y)            
-            preds = torch.argmax(logits, dim=1, keepdim=True)
-        # probs = torch.sigmoid(logits)
-        # probs = torch.softmax(logits, dim=1)
-        # preds = torch.argmax(probs, dim=1, keepdim=True)
+            loss = self.criterion(logits, y)
+            probs = torch.softmax(logits, dim=1)
         
-        self.acc_val(probs, y)  # preds
+        self.acc_val(probs, y)
         self.auroc_val(probs, y)
         self.f1_val(probs, y)
         self.precision_val(probs, y)
@@ -203,19 +186,16 @@ class ClassifierLightning(pl.LightningModule):
         logits = self.forward(x, coords)
 
         if self.config.task == "binary":
-            loss = self.criterion(logits, y.unsqueeze(0).float())
+            y = y.unsqueeze(1)
+            loss = self.criterion(logits, y.float())
             probs = torch.sigmoid(logits)
             preds = torch.round(probs)
-        else:           
-            loss = self.criterion(logits, y)            
-            preds = torch.argmax(logits, dim=1, keepdim=True)   
-        # probs = torch.sigmoid(logits)
-        # probs = torch.softmax(logits, dim=1)
-        # preds = torch.argmax(probs, dim=1, keepdim=True)
+        else:
+            loss = self.criterion(logits, y)
+            probs = torch.softmax(logits, dim=1)
+            preds = torch.argmax(probs, dim=1, keepdim=True)
         
-        if self.config.task == "binary":
-            y = y.unsqueeze(1)
-        self.acc_test(probs, y)  # preds
+        self.acc_test(probs, y)  
         self.auroc_test(probs, y)
         self.f1_test(probs, y)
         self.precision_test(probs, y)
@@ -231,7 +211,6 @@ class ClassifierLightning(pl.LightningModule):
         self.log("recall/test", self.recall_test, prog_bar=False, on_step=False, on_epoch=True)
         self.log("specificity/test", self.specificity_test, prog_bar=False, on_step=False, on_epoch=True)
 
-        # TODO rewrite for batch size > 1 (not needed atm bc bs=1 always in testing mode)
         outputs = pd.DataFrame(
             data=[[patient[0], y.item(), preds.item(), logits.squeeze(), (y==preds).int().item()]], 
             columns=['patient', 'ground_truth', 'prediction', 'logits', 'correct']
