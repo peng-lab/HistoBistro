@@ -1,66 +1,39 @@
 # logging options
-save_dir: /home/ubuntu/logs/idkidc
-project: MSI_transformer
+save_dir: </path/to/logging/dir>
+project: <project_name>
 name: debug
 
 # task definition
-data_config: /home/ubuntu/projects/idkidc/data_config.yaml
-task: binary
-target: isMSIH
-num_classes: 1
-cohorts: ["TCGA"]
-ext_cohorts: []
+data_config: data_config.yaml
+task: <binary/multiclass/multilabel>
+target: <target>
+num_classes: <int>
+cohorts: ["<cohort_name1>", "<cohort_name2>"]
+ext_cohorts: ["<external_cohort_name>"]
 clini_info: {}
 seed: null
 label_dict:
-  Not mut.: 0
-  Mutat.: 1
-  nonMSIH: 0
-  MSIH: 1
-  WT: 0
-  MUT: 1
-  wt: 0
-  MT: 1
-  # clinical information
-  left: 1
-  right: 0
-  female: 1
-  male: 0
-  # CRC staging
-  Stage I: 0
-  Stage II: 1
-  Stage III: 2
-  Stage IV: 3
-  # dermAI / HistoGPT project
-  Aktinische Keratose: 0
-  Basalzellkarzinom: 1
-  Benign Neoplasm: 2
-  Spinozelluläres Karzinom: 3
+  <class_0>: 0
+  <class_1>: 1
 
 # model options
-model: AttentionMIL
-model_config:  # null
-  heads: 4
-  dim_head: 64
-  dim: 256
-  mlp_dim: 256
-  pos_enc: null
-norm: histaugan
-feats: ctranspath
-input_dim: 768
-num_tiles: 8000
+model: <Transformer/TransMIL/AttentionMIL/...>
+model_config: null
+norm: <normalizatio_used>
+feats: <feature_extractor_used>
+input_dim: <feature_dim>
+num_tiles: -1
 pad_tiles: false
 
 # training options
 folds: 5
 num_epochs: 1
-criterion:  BCEWithLogitsLoss # CrossEntropyLoss
-optimizer: Adam
-lr_scheduler: OneCycleLR
-lr_scheduler_config: # null
-  max_lr: 1.0e-03
-lr: 1.0e-04
-wd: 1.0e-02
+criterion: <BCEWithLogitsLoss/CrossEntropyLoss/...>
+optimizer: <AdamW/Adam/...>
+lr_scheduler: null
+lr_scheduler_config: null
+lr: 2.0e-05
+wd: 2.0e-05
 bs: 1
 stop_criterion: loss
 val_check_interval: 500
