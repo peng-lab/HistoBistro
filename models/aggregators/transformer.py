@@ -4,9 +4,6 @@ from einops import repeat
 
 from models.aggregators.aggregator import BaseAggregator
 from models.aggregators.model_utils import Attention, FeedForward, PreNorm
-from models.aggregators.positional_encodings import (ConcatEmbedding,
-                                                     CoordinateEmbedding,
-                                                     PositionalEncoding2D)
 
 
 class TransformerBlocks(nn.Module):
@@ -63,21 +60,13 @@ class Transformer(BaseAggregator):
         self.norm = nn.LayerNorm(dim)
         self.dropout = nn.Dropout(emb_dropout)
         self.pos_enc = pos_enc
-        if pos_enc == 'CoordinateEmbedding':
-            self.pos_enc = CoordinateEmbedding(2, dim)
-        elif pos_enc == 'PositionalEncoding2D':
-            self.pos_enc = PositionalEncoding2D(dim)
-        elif pos_enc == 'ConcatEmbedding':
-            self.pos_enc = ConcatEmbedding(2, dim-(heads*dim_head))
 
     def forward(self, x, coords=None, register_hook=False):
         b, _, _ = x.shape
 
         x = self.projection(x)
 
-        if isinstance(self.pos_enc, ConcatEmbedding):
-            x = torch.cat((x, self.pos_enc(coords)), dim=-1)
-        elif self.pos_enc:
+        if self.pos_enc:
             x = x + self.pos_enc(coords)
 
         if self.pool == 'cls':
