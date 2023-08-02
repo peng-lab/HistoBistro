@@ -21,7 +21,7 @@ from optuna.integration import PyTorchLightningPruningCallback
 """
 run file with 
 
-python tune.py --config_file config_staging.yaml --num_epochs 10
+python tune.py --config_file config_staging.yaml --num_epochs xy
 
 in case of the following error:
 AttributeError: 'Trainer' object has no attribute 'training_type_plugin'
@@ -29,29 +29,27 @@ caused by version mismatch of optuna and pytorch_lightning
 change l.99 in /home/ubuntu/Miniconda3-py39_4.12.0-Linux-x86_64/envs/denbi/lib/python3.10/site-packages/optuna/integration/pytorch_lightning.py to:
 should_stop = trainer.should_stop
 """
-# TODO make nice and functional, so far tune for lr and wd but without visualizing the results
 
 # filter out UserWarnings from the torchmetrics package
 warnings.filterwarnings("ignore", category=UserWarning)
 
 def objective(trial: optuna.trial.Trial) -> float:
-    # checkpoint_callback = ModelCheckpoint(Path(MODEL_DIR) / f"trial_{trial.number}", monitor="auroc/val")
     torch.cuda.empty_cache()
     
     # --------------------------------------------------------
     # choose params
     # --------------------------------------------------------
+    
     val_metric = 'acc/val'
     lr = trial.suggest_float("learning_rate", 1e-6, 1e-2)
     wd = trial.suggest_float("weight_decay", 1e-6, 1e-2)
-    # optimizer = trial.suggest_categorical("optimizer", ["AdamW", "Adam", "SGD"])
-    # lr_scheduler = trial.suggest_categorical("lr_scheduler", ["StepLR", "CosineAnnealingLR", "ReduceLROnPlateau", "OneCycleLR"])
     heads = trial.suggest_categorical("heads", [4, 8, 12])
     dim_head = trial.suggest_categorical("dim_heads", [32, 64, 128])
     
     # --------------------------------------------------------
     # load data
     # --------------------------------------------------------
+    
     print('\n--- load dataset ---')
     data, clini_info = get_multi_cohort_df(
         cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
@@ -60,9 +58,11 @@ def objective(trial: optuna.trial.Trial) -> float:
     cfg.input_dim += len(cfg.clini_info.keys())
 
     train_cohorts = f'{", ".join(cfg.cohorts)}'
+    
     # --------------------------------------------------------
     # k-fold cross validation
     # --------------------------------------------------------
+    
     # load fold directory from data_config
     with open(cfg.data_config, 'r') as f:
         data_config = yaml.safe_load(f)
@@ -121,10 +121,9 @@ def objective(trial: optuna.trial.Trial) -> float:
         # --------------------------------------------------------
         # model
         # --------------------------------------------------------
+        
         cfg.lr = lr
         cfg.wd = wd
-        # cfg.optimizer = optimizer
-        # cfg.lr_scheduler = lr_scheduler
         cfg.heads = heads
         cfg.dim_head = dim_head
         cfg.dim = heads * dim_head
@@ -134,8 +133,7 @@ def objective(trial: optuna.trial.Trial) -> float:
         # --------------------------------------------------------
         # logging
         # --------------------------------------------------------
-
-        # logging
+        
         config = dict(trial.params)
         config["trial.number"] = trial.number
         logger = WandbLogger(
@@ -147,7 +145,11 @@ def objective(trial: optuna.trial.Trial) -> float:
             reinit=True,
             settings=wandb.Settings(start_method='fork'),
         )
-
+        
+        # --------------------------------------------------------
+        # training
+        # --------------------------------------------------------
+        
         trainer = pl.Trainer(
             logger=logger,
             precision='16-mixed',
@@ -162,8 +164,6 @@ def objective(trial: optuna.trial.Trial) -> float:
         hyperparameters = dict(
             lr=lr, 
             wd=wd, 
-            # optimizer=optimizer, 
-            # lr_scheduler=lr_scheduler,
             heads=heads, 
             dim_heads=dim_head
         )
@@ -172,9 +172,7 @@ def objective(trial: optuna.trial.Trial) -> float:
         
         val_metric_folds.append(trainer.callback_metrics[val_metric].detach().item())
         wandb.finish()  # required for new wandb run in next fold
-
     
-    # return trainer.callback_metrics["acc/val"].detach().item()
     return sum(val_metric_folds) / len(val_metric_folds)
 
 
@@ -189,10 +187,7 @@ if __name__ == "__main__":
     # Update the configuration with the values from the argument parser
     for arg_name, arg_value in vars(args).items():
         if arg_value is not None and arg_name != 'config_file':
-            config[arg_name]['value'] = getattr(args, arg_name)
-
-    # Create a flat config file without descriptions
-    config = {k: v['value'] for k, v in config.items()}
+            config[arg_name] = getattr(args, arg_name)
 
     print('\n--- load options ---')
     for name, value in sorted(config.items()):
@@ -202,7 +197,7 @@ if __name__ == "__main__":
     cfg = argparse.Namespace(**config)
     
     # --------------------------------------------------------
-    # set up paths
+    # set up hyperparameter search with optuna
     # --------------------------------------------------------
     
     sampler = optuna.samplers.TPESampler(multivariate=True)
