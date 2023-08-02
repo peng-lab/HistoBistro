@@ -1,10 +1,12 @@
 import importlib
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
+
 from models.aggregators.aggregator import BaseAggregator
 
 
@@ -22,26 +24,25 @@ def get_loss(name, **kwargs):
         raise ValueError(f"Invalid loss name: {name}")
 
 
-# TODO: finish get_model
-def get_model(model_name):
+def get_model(model_name, **kwargs):
     """
-    Import the module "model/[model_name].py".
-    In the file, the class called DatasetNameDataset() will
-    be instantiated. It has to be a subclass of TissueDataset,
-    and it is case-insensitive.
+    Import the module "model/aggregators/[model_name.lower()].py".
+    In the file, the class called model_name will
+    be instantiated. It has to be a subclass of BaseAggregator,
+    and it is case-sensitive.
     """
-    model_filename = "model.aggregator" + model_name
+    model_filename = "models.aggregators." + model_name.lower()
     model_library = importlib.import_module(model_filename)
 
-    model = None
-    target_model_name = model_name.replace('_', '') + 'Model'
+    model_class = None
     for name, cls in model_library.__dict__.items():
-        if name.lower() == target_model_name.lower() \
-           and issubclass(cls, BaseAggregator):
-            model = cls
+        if name == model_name and issubclass(cls, BaseAggregator):
+            model_class = cls
 
-    if model is None:
+    if model_class is None:
         raise NotImplementedError("Model does not exist!")
+
+    model = model_class(**kwargs)
 
     return model
 
@@ -60,22 +61,22 @@ def get_optimizer(name, model, lr=0.01, wd=0.1):
         raise ValueError(f"Invalid optimizer name: {name}")
 
 
-def get_scheduler(name, optimizer, **kwargs):
+def get_scheduler(name, optimizer, *args, **kwargs):
     # Check if the name is a valid scheduler name
     if name in lr_scheduler.__dict__:
         # Get the scheduler class from the torch.optim.lr_scheduler module
         scheduler_class = getattr(lr_scheduler, name)
         # Instantiate the scheduler with the optimizer and other keyword arguments
-        scheduler = scheduler_class(optimizer, **kwargs)
+        scheduler = scheduler_class(optimizer, *args, **kwargs)
         # Return the scheduler
         return scheduler
     else:
         # Raise an exception if the name is not valid
         raise ValueError(f"Invalid scheduler name: {name}")
-    
 
-def save_results(cfg, results, base_path, train_cohorts, test_cohorts):
-    # save results to dataframe 
+
+def save_results(cfg, results, base_path, train_cohorts, test_cohorts, mode="test"):
+    # save results to dataframe
     labels_per_fold = list(results[test_cohorts[0]][0].keys())
     labels_mean_std = [f'{l} {v}' for l in labels_per_fold for v in ['mean', 'std']]
     labels = [f'{l}_fold{k}' for l in labels_per_fold for k in range(len(results[test_cohorts[0]]))]
@@ -103,10 +104,18 @@ def save_results(cfg, results, base_path, train_cohorts, test_cohorts):
     results_df['Algorithm'] = cfg.model
     results_df['Comments'] = f'{cfg.logging_name}, random state for splitting {cfg.seed}'
     # reorder columns and save to csv
-    cols = results_df.columns.to_list()[num_cols:] + results_df.columns.to_list()[:num_cols]        
+    cols = results_df.columns.to_list()[num_cols:] + results_df.columns.to_list()[:num_cols]
     results_df = results_df[cols]
     # append to existing dataframe
     if Path(base_path / f'results_{cfg.logging_name}.csv').is_file():
-        existing = pd.read_csv(base_path / f'results_{cfg.logging_name}.csv', sep=',')
+        existing = pd.read_csv(base_path / f'results_{mode}_{cfg.logging_name}.csv', sep=',')
         results_df = pd.concat([existing, results_df], ignore_index=True)
-    results_df.to_csv(base_path / f'results_{cfg.logging_name}.csv', sep=',', index=False)
+    results_df.to_csv(base_path / f'results_{mode}_{cfg.logging_name}.csv', sep=',', index=False)
+
+
+# test get_model function for all models
+get_model('Transformer', num_classes=4, input_dim=512)
+get_model('AttentionMIL', num_classes=4, input_dim=512)
+# get_model('LAMIL', num_classes=4, input_dim=512)
+get_model('Perceiver', num_classes=4, input_dim=512)
+get_model('TransMIL', num_classes=4, input_dim=512)

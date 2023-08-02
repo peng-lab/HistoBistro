@@ -1,8 +1,7 @@
-COHORT_NAME:
-  targets:
-    - target_label
+<COHORT_NAME>:
   clini_table: /path/to/table/with/clinical/annotations.xlsx
   slide_csv: /path/to/csv/file/with/slide/names/per/patient.csv
   feature_dir:
-    normalization/augmentation:  # in ['raw', 'histaugan', 'macenko']
-      ctranspath: /path/to/folder/with/features  # in ['ctranspath', 'retccl']
+    <normalization/augmentation>:  # in ['raw', 'histaugan', 'macenko']
+      <feature_extractor_used>: /path/to/folder/with/features  # in ['ctranspath', 'retccl']
+  folds: /path/to/folder/with/features  # if it doesn't exist yet, it will be created automatically

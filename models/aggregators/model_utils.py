@@ -2,19 +2,18 @@
 Hacked together from https://github.com/lucidrains
 """
 
-import dgl.function as fn
 import math
+from functools import wraps
+from math import ceil, pi
+from typing import Optional
+
+import dgl.function as fn
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
 from einops import rearrange, reduce
-from functools import wraps
-from math import ceil, pi 
-from torch import nn, einsum
-from typing import Optional
-
+from torch import einsum, nn
 
 # --------------------
 # Helpers

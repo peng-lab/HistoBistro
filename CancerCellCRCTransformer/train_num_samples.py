@@ -8,20 +8,23 @@ import random
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-import wandb
 import yaml
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import CSVLogger, WandbLogger
-from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
 from classifier import ClassifierLightning
-from data_utils import MILDataset, MILDatasetIndices, get_multi_cohort_df
+from data import MILDataset, get_multi_cohort_df
 from options import Options
-from utils import save_results
 
 # filter out UserWarnings from the torchmetrics package
 warnings.filterwarnings("ignore", category=UserWarning)
+
+"""
+move to main folder and run file with 
+
+python train_num_samples.py 
+
+to perform analysis of the performance depending on the number of training samples.
+"""
 
 
 def main(cfg):
@@ -29,7 +32,7 @@ def main(cfg):
     pl.seed_everything(cfg.seed, workers=True)
 
     # saving locations
-    base_path = Path(cfg.save_dir)  # adapt to own target path
+    base_path = Path(cfg.save_dir)  
     cfg.logging_name = f'num_samples_{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if not cfg.debug else 'debug'
     base_path = base_path / cfg.logging_name
     base_path.mkdir(parents=True, exist_ok=True)
@@ -43,13 +46,15 @@ def main(cfg):
     norm_test = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
 
     # cohorts and targets
+    # --- for MSI cohorts
     cfg.cohorts = ['CPTAC', 'DACHS', 'DUSSEL', 'Epi700', 'ERLANGEN', 'FOXTROT', 'MCO', 'MECC', 'MUNICH', 'QUASAR', 'RAINBOW', 'TCGA', 'TRANSCOT']
     cfg.ext_cohorts = ['YCR-BCIP-resections', 'YCR-BCIP-biopsies', 'MAINZ', 'CHINA']
+    # --- for BRAF / KRAS cohorts
+    # cfg.cohorts = ['DACHS', 'MCO', 'QUASAR', 'RAINBOW', 'TCGA']
+    # cfg.ext_cohorts = ['Epi700']
     
-    categories = ['Not mut.', 'Mutat.', 'nonMSIH', 'MSIH', 'WT', 'MUT', 'wt', 'MT']
-
     data, clini_info = get_multi_cohort_df(
-        cfg.data_config, cfg.cohorts, [cfg.target], categories, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
+        cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
     )
     cfg.clini_info = clini_info
     cfg.input_dim += len(cfg.clini_info.keys())
@@ -59,17 +64,17 @@ def main(cfg):
             cfg.ext_cohorts.pop(cfg.ext_cohorts.index(cohort))
 
     train_cohorts = f'{", ".join(cfg.cohorts)}'
-    test_cohorts = [train_cohorts, *cfg.ext_cohorts]
-    results = {t: [] for t in test_cohorts}
 
     test_ext_dataloader = []
     for ext in cfg.ext_cohorts:
+        test_data, clini_info = get_multi_cohort_df(
+            cfg.data_config, [ext], [cfg.target], cfg.label_dict, norm=norm_test, feats=cfg.feats, clini_info=cfg.clini_info
+        )
         dataset_ext = MILDataset(
-            cfg.data_config,
-            [ext], [cfg.target],
-            categories,
+            test_data,
+            list(range(len(test_data))), 
+            [cfg.target],
             norm=norm_test,
-            feats=cfg.feats,
             clini_info=cfg.clini_info
         )
         test_ext_dataloader.append(DataLoader(dataset=dataset_ext, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True))
@@ -80,15 +85,13 @@ def main(cfg):
     print(f'num training samples in {cfg.cohorts}: {len(data)}')
 
     # start training
-    num_samples = [62, 128, 256, 512, 1024, 2048, 4096, 8192, len(data)] if args.num_samples is None else [args.num_samples, ]
-    # num_samples = [32, 64, 128, 256, *list(range(500, len(dataset)+1, 500))] if args.num_samples is None else [args.num_samples, ]
-    # num_samples = [50, 100, 250, 8000]
-    # num_samples = [50,]
+    num_samples = [64, 128, 256, 512, 1024, 2048, 4096, 8192, len(data)] if args.num_samples is None else [args.num_samples, ]
+
     ext_auc_dict = {key: {n: [] for n in num_samples} for key in cfg.ext_cohorts}
     for n in num_samples:
         for k in range(5):
             train_idxs = random.sample(list(range(len(data))), n)
-            train_dataset = MILDatasetIndices(
+            train_dataset = MILDataset(
                 data,
                 train_idxs, [cfg.target],
                 num_tiles=cfg.num_tiles,
@@ -101,18 +104,16 @@ def main(cfg):
                 dataset=train_dataset, batch_size=cfg.bs, shuffle=True, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
             )
 
-            if len(train_dataset) < cfg.val_check_interval:
-                cfg.val_check_interval = len(train_dataset)
+            if cfg.model == 'AttentionMIL':
+                cfg.optim = "Adam"
+                cfg.lr_scheduler = "OneCycleLR"
+                cfg.steps_per_epoch = len(train_dataloader)
+                cfg.pct_start = 0.25
 
-            # if args.model == 'attmil':
-            #     opt = torch.optim.Adam(m.parameters(), args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=args.wd)
-            #     lr_scheduler = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=args.lr, epochs=args.num_epochs, steps_per_epoch=len(train_dataloader), pct_start=0.25)
-            # else:
-            #     opt = torch.optim.AdamW(m.parameters(), args.lr, betas=(0.9, 0.999), eps=1e-08, weight_decay=args.wd, amsgrad=False)
-
-            num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
-            cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
-            cfg.criterion = "BCEWithLogitsLoss"
+            # class weighting for binary classification
+            if cfg.task == 'binary':
+                num_pos = sum([train_dataset[i][2] for i in range(len(train_dataset))])
+                cfg.pos_weight = torch.Tensor((len(train_dataset) - num_pos) / num_pos)
 
             # --------------------------------------------------------
             # model
@@ -120,26 +121,18 @@ def main(cfg):
             model = ClassifierLightning(cfg)
 
             # --------------------------------------------------------
-            # model saving
+            # training
             # --------------------------------------------------------
-
+                
             trainer = pl.Trainer(
-                # logger=[logger, csv_logger],
                 accelerator='auto',
-                # callbacks=[checkpoint_callback],
+                devices=1,
                 max_epochs=cfg.num_epochs,
-                # val_check_interval=cfg.val_check_interval,
                 check_val_every_n_epoch=None,
-                # limit_val_batches=0.1,  # debug
-                # limit_train_batches=6,  # debug
-                # limit_val_batches=6,    # debug
-                # log_every_n_steps=1,  # debug
-                # fast_dev_run=True,    # debug
-                # max_steps=6,          # debug
-                enable_model_summary=False,  # debug
+                enable_model_summary=False,
             )
 
-            results_val = trainer.fit(
+            trainer.fit(
                 model,
                 train_dataloader,
             )
@@ -148,26 +141,23 @@ def main(cfg):
 
             # test model external cohort
             for idx, ext_cohort in enumerate(cfg.ext_cohorts):
-                print("Testing: ", test_cohorts[idx])
-                # test_cohorts_evaluated.append(test_cohorts[idx])
+                print("Testing: ", ext_cohort)
                 results_test = trainer.test(
                     model,
                     test_ext_dataloader[idx],
-                    # ckpt_path='best',
                 )
-
                 ext_auc_dict[ext_cohort][n].append(results_test[0]['auroc/test'])
     
         # save results in data frame 
         for ext_cohort in cfg.ext_cohorts:
-            results_csv = result_path / f'results_num_samples_{ext_cohort}_{cfg.model}_{cfg.feats}.csv'
+            results_csv = base_path / f'results_num_samples_{ext_cohort}_{cfg.model}_{cfg.feats}.csv'
             columns = ["num samples"] + [f'fold {i}' for i in range(5)]
             new_results = pd.DataFrame(data=np.array([[n, *ext_auc_dict[ext_cohort][n]]]), columns=columns)
 
             # append results to existing results data frame
             if results_csv.is_file():
                 results_df = pd.read_csv(results_csv, dtype=str)
-                if n in results_df["num samples"]:
+                if n in results_df["num samples"].unique():
                     continue
                 else:
                     results_df = results_df.append(new_results)
@@ -180,12 +170,12 @@ def main(cfg):
     print('-------------------------')
     print(f'training for {args.num_epochs} epochs')
     print(f'lists')
-    for ext_cohort in ext_cohorts:
+    for ext_cohort in cfg.ext_cohorts:
         print(ext_cohort)
         for n in num_samples:
             print(f'{n: <4}', ext_auc_dict[ext_cohort][n])
     print('---')
-    for ext_cohort in ext_cohorts:
+    for ext_cohort in cfg.ext_cohorts:
         print(ext_cohort)
         for n in num_samples:
             print(f'{n: <4} {np.mean(np.array(ext_auc_dict[ext_cohort][n])).round(4):.4f}±{np.std(np.array(ext_auc_dict[ext_cohort][n])).round(4):.4f}')
@@ -203,10 +193,7 @@ if __name__ == '__main__':
     # Update the configuration with the values from the argument parser
     for arg_name, arg_value in vars(args).items():
         if arg_value is not None and arg_name != 'config_file':
-            config[arg_name]['value'] = getattr(args, arg_name)
-    
-    # Create a flat config file without descriptions
-    config = {k: v['value'] for k, v in config.items()}
+            config[arg_name] = getattr(args, arg_name)
 
     print('\n--- load options ---')
     for name, value in sorted(config.items()):

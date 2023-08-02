@@ -1,9 +1,11 @@
 import torch
-from torch import nn
 from einops import rearrange, repeat
 from einops.layers.torch import Reduce
+from torch import nn
+
 from models.aggregators import BaseAggregator
-from models.aggregators.model_utils import cache_fn, fourier_encode, PreNorm, FeedForward, PerceiverAttention
+from models.aggregators.model_utils import (FeedForward, PerceiverAttention,
+                                            PreNorm, cache_fn, fourier_encode)
 
 
 class Perceiver(BaseAggregator):
@@ -13,7 +15,7 @@ class Perceiver(BaseAggregator):
         num_freq_bands=6,
         depth=2,  
         max_freq=10.,
-        input_channels=512,
+        input_dim=512,
         input_axis=1,
         num_latents=256,
         latent_dim=512,
@@ -69,7 +71,7 @@ class Perceiver(BaseAggregator):
         fourier_channels = (
             input_axis * ((num_freq_bands * 2) + 1)
         ) if fourier_encode_data else 0
-        input_dim = fourier_channels + input_channels
+        input_dim = fourier_channels + input_dim
 
         self.latents = nn.Parameter(torch.randn(num_latents, latent_dim))
 

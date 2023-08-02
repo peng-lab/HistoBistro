@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+
 from models.aggregators import BaseAggregator
 from models.aggregators.model_utils import GraphTransformerLayer
 

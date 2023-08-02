@@ -3,49 +3,57 @@ import os
 import warnings
 from pathlib import Path
 
-import optuna
 import pandas as pd
 import pytorch_lightning as pl
 import torch
 import wandb
 import yaml
-from optuna.integration import PyTorchLightningPruningCallback
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.loggers import CSVLogger, WandbLogger
 from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
 from classifier import ClassifierLightning
 from data import MILDataset, get_multi_cohort_df
 from options import Options
+from utils import save_results
 
 """
-run file with 
+train and validate a model with nested k-fold cross validation without evaluating on the test set.
 
-python tune.py --config_file config.yaml --num_epochs xy
-
-in case of the following error:
-AttributeError: 'Trainer' object has no attribute 'training_type_plugin'
-caused by version mismatch of optuna and pytorch_lightning
-change l.99 in /home/ubuntu/Miniconda3-py39_4.12.0-Linux-x86_64/envs/denbi/lib/python3.10/site-packages/optuna/integration/pytorch_lightning.py to:
-should_stop = trainer.should_stop
+k-fold cross validation (k=5)
+[--|--|--|**|##]
+[--|--|**|##|--]
+[--|**|##|--|--]
+[**|##|--|--|--]
+[##|--|--|--|**]
+where 
+-- train
+** val
+## test
 """
 
 # filter out UserWarnings from the torchmetrics package
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
-def objective(trial: optuna.trial.Trial) -> float:
-    torch.cuda.empty_cache()
+def main(cfg):
+    cfg.seed = torch.randint(0, 1000, (1, )).item() if cfg.seed is None else cfg.seed
+    pl.seed_everything(cfg.seed, workers=True)
 
     # --------------------------------------------------------
-    # choose params
+    # set up paths
     # --------------------------------------------------------
 
-    val_metric = 'acc/val'
-    lr = trial.suggest_float("learning_rate", 1e-6, 1e-2)
-    wd = trial.suggest_float("weight_decay", 1e-6, 1e-2)
-    heads = trial.suggest_categorical("heads", [4, 8, 12])
-    dim_head = trial.suggest_categorical("dim_heads", [32, 64, 128])
+    base_path = Path(cfg.save_dir)
+    cfg.logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if cfg.name != 'debug' else 'debug'
+    base_path = base_path / cfg.logging_name
+    base_path.mkdir(parents=True, exist_ok=True)
+    model_path = base_path / 'models'
+    result_path = base_path / 'results'
+    result_path.mkdir(parents=True, exist_ok=True)
+
+    norm_val = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
 
     # --------------------------------------------------------
     # load data
@@ -64,6 +72,8 @@ def objective(trial: optuna.trial.Trial) -> float:
     cfg.input_dim += len(cfg.clini_info.keys())
 
     train_cohorts = f'{", ".join(cfg.cohorts)}'
+    val_cohorts = [train_cohorts]
+    results_validation = {t: [] for t in val_cohorts}
 
     # --------------------------------------------------------
     # k-fold cross validation
@@ -82,8 +92,6 @@ def objective(trial: optuna.trial.Trial) -> float:
     splits = skf.split(patient_df, patient_df[target_stratisfy])
     splits = list(splits)
 
-    val_metric_folds = []
-    # training dataset
     for k in range(cfg.folds):
         # read split from csv-file if exists already else save split to csv
         if Path(fold_path / f'fold{k}_train.csv').exists():
@@ -118,16 +126,12 @@ def objective(trial: optuna.trial.Trial) -> float:
         )
         if len(train_dataset) < cfg.val_check_interval:
             cfg.val_check_interval = len(train_dataset)
+        if cfg.lr_scheduler == 'OneCycleLR':
+            cfg.lr_scheduler_config['total_steps'] = cfg.num_epochs * len(train_dataloader)
 
         # validation dataset
-        norm_val = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
         val_dataset = MILDataset(
-            data,
-            val_idxs, [cfg.target],
-            num_tiles=cfg.num_tiles,
-            pad_tiles=cfg.pad_tiles,
-            norm=norm_val,
-            clini_info=cfg.clini_info
+            data, val_idxs, [cfg.target], norm=norm_val, clini_info=cfg.clini_info
         )
         print(f'num validation samples in fold {k}: {len(val_dataset)}')
         val_dataloader = DataLoader(
@@ -147,56 +151,86 @@ def objective(trial: optuna.trial.Trial) -> float:
         # model
         # --------------------------------------------------------
 
-        cfg.lr = lr
-        cfg.wd = wd
-        cfg.heads = heads
-        cfg.dim_head = dim_head
-        cfg.dim = heads * dim_head
-        cfg.mlp_dim = heads * dim_head
         model = ClassifierLightning(cfg)
 
         # --------------------------------------------------------
         # logging
         # --------------------------------------------------------
 
-        config = dict(trial.params)
-        config["trial.number"] = trial.number
         logger = WandbLogger(
             project=cfg.project,
-            group=f'tune_{cfg.name}',
-            name=f'{trial.number}_{k}',
+            name=f'{cfg.logging_name}_fold{k}',
             save_dir=cfg.save_dir,
-            config=config,
             reinit=True,
             settings=wandb.Settings(start_method='fork'),
+            mode='online'
+        )
+
+        csv_logger = CSVLogger(
+            save_dir=result_path,
+            name=f'fold{k}',
+        )
+
+        # --------------------------------------------------------
+        # model saving
+        # --------------------------------------------------------
+
+        checkpoint_callback = ModelCheckpoint(
+            monitor='auroc/val' if cfg.stop_criterion == 'auroc' else 'loss/val',
+            dirpath=model_path,
+            filename=f'best_model_{cfg.logging_name}_fold{k}',
+            save_top_k=1,
+            mode='max' if cfg.stop_criterion == 'auroc' else 'min',
+        )
+
+        # --------------------------------------------------------
+        # set up trainer
+        # --------------------------------------------------------
+
+        trainer = pl.Trainer(
+            logger=[logger, csv_logger],
+            accelerator='auto',
+            devices=1,
+            callbacks=[checkpoint_callback],
+            max_epochs=cfg.num_epochs,
+            val_check_interval=cfg.val_check_interval,
+            check_val_every_n_epoch=None,
+            enable_model_summary=False,
         )
 
         # --------------------------------------------------------
         # training
         # --------------------------------------------------------
 
-        trainer = pl.Trainer(
-            logger=logger,
-            precision='16-mixed',
-            accelerator='auto',
-            devices=1,
-            max_epochs=cfg.num_epochs,
-            gradient_clip_val=1,
-            enable_model_summary=False,
-            callbacks=[PyTorchLightningPruningCallback(trial, monitor=val_metric)],
+        if Path(model_path / f'best_model_{cfg.logging_name}_fold{k}.pth').exists():
+            pass
+        else:
+            results_val = trainer.fit(
+                model,
+                train_dataloader,
+                val_dataloader,
+            )
+            logger.log_table('results/val', results_val)
+
+        # --------------------------------------------------------
+        # validating
+        # --------------------------------------------------------
+
+        print("Evaluating: ", val_cohorts)
+        results_val_final = trainer.validate(
+            model,
+            val_dataloader,
+            ckpt_path='best',
         )
+        results_validation[val_cohorts[0]].append(results_val_final[0])
 
-        hyperparameters = dict(lr=lr, wd=wd, heads=heads, dim_heads=dim_head)
-        trainer.logger.log_hyperparams(hyperparameters)
-        trainer.fit(model, train_dataloader, val_dataloader)
-
-        val_metric_folds.append(trainer.callback_metrics[val_metric].detach().item())
         wandb.finish()  # required for new wandb run in next fold
 
-    return sum(val_metric_folds) / len(val_metric_folds)
+    # save results to csv file
+    save_results(cfg, results_validation, base_path, train_cohorts, val_cohorts, mode="val")
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     parser = Options()
     args = parser.parse()
 
@@ -213,27 +247,5 @@ if __name__ == "__main__":
     for name, value in sorted(config.items()):
         print(f'{name}: {str(value)}')
 
-    global cfg
-    cfg = argparse.Namespace(**config)
-
-    # --------------------------------------------------------
-    # set up hyperparameter search with optuna
-    # --------------------------------------------------------
-
-    sampler = optuna.samplers.TPESampler(multivariate=True)
-    pruner = optuna.pruners.HyperbandPruner()
-    study = optuna.create_study(direction="maximize", sampler=sampler, pruner=pruner)
-    study.optimize(objective, n_trials=50, timeout=None, gc_after_trial=True)
-    print("Number of finished trials: {}".format(len(study.trials)))
-    print("Best trial:")
-    trial = study.best_trial
-    print("  Value: {}".format(trial.value))
-    print("  Params: ")
-    for key, value in trial.params.items():
-        print("    {}: {}".format(key, value))
-
-    wandb.init(project=cfg.project, group=f'tune_{cfg.name}', name=f'final')
-    hist = optuna.visualization.plot_optimization_history(study)
-    wandb.log({"optuna/plot_optimization_history": hist})
-    imp = optuna.visualization.plot_param_importances(study)
-    wandb.log({"optuna/plot_param_importances": imp})
+    config = argparse.Namespace(**config)
+    main(config)
