@@ -59,6 +59,7 @@ class Transformer(BaseAggregator):
 
         self.norm = nn.LayerNorm(dim)
         self.dropout = nn.Dropout(emb_dropout)
+        
         self.pos_enc = pos_enc
 
     def forward(self, x, coords=None, register_hook=False):
