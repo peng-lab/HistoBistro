@@ -8,20 +8,23 @@ import random
 import pandas as pd
 import pytorch_lightning as pl
 import torch
-import wandb
 import yaml
-from pytorch_lightning.callbacks import ModelCheckpoint
-from pytorch_lightning.loggers import WandbLogger
-from sklearn.model_selection import StratifiedKFold, train_test_split
 from torch.utils.data import DataLoader
 
 from classifier import ClassifierLightning
 from data import MILDataset, get_multi_cohort_df
 from options import Options
-from utils import save_results
 
 # filter out UserWarnings from the torchmetrics package
 warnings.filterwarnings("ignore", category=UserWarning)
+
+"""
+move to main folder and run file with 
+
+python train_num_samples.py 
+
+to perform analysis of the performance depending on the number of training samples.
+"""
 
 
 def main(cfg):
@@ -44,11 +47,11 @@ def main(cfg):
 
     # cohorts and targets
     # --- for MSI cohorts
-    # cfg.cohorts = ['CPTAC', 'DACHS', 'DUSSEL', 'Epi700', 'ERLANGEN', 'FOXTROT', 'MCO', 'MECC', 'MUNICH', 'QUASAR', 'RAINBOW', 'TCGA', 'TRANSCOT']
-    # cfg.ext_cohorts = ['YCR-BCIP-resections', 'YCR-BCIP-biopsies', 'MAINZ', 'CHINA']
+    cfg.cohorts = ['CPTAC', 'DACHS', 'DUSSEL', 'Epi700', 'ERLANGEN', 'FOXTROT', 'MCO', 'MECC', 'MUNICH', 'QUASAR', 'RAINBOW', 'TCGA', 'TRANSCOT']
+    cfg.ext_cohorts = ['YCR-BCIP-resections', 'YCR-BCIP-biopsies', 'MAINZ', 'CHINA']
     # --- for BRAF / KRAS cohorts
-    cfg.cohorts = ['DACHS', 'MCO', 'QUASAR', 'RAINBOW', 'TCGA']
-    cfg.ext_cohorts = ['Epi700']
+    # cfg.cohorts = ['DACHS', 'MCO', 'QUASAR', 'RAINBOW', 'TCGA']
+    # cfg.ext_cohorts = ['Epi700']
     
     data, clini_info = get_multi_cohort_df(
         cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
@@ -118,17 +121,8 @@ def main(cfg):
             model = ClassifierLightning(cfg)
 
             # --------------------------------------------------------
-            # model saving
+            # training
             # --------------------------------------------------------
-            
-            logger = WandbLogger(
-                project=cfg.project,
-                name=f'{cfg.logging_name}_fold{k}',
-                save_dir=cfg.save_dir,
-                reinit=True,
-                settings=wandb.Settings(start_method='fork'),
-                mode='offline'
-            )
                 
             trainer = pl.Trainer(
                 accelerator='auto',
@@ -199,10 +193,7 @@ if __name__ == '__main__':
     # Update the configuration with the values from the argument parser
     for arg_name, arg_value in vars(args).items():
         if arg_value is not None and arg_name != 'config_file':
-            config[arg_name]['value'] = getattr(args, arg_name)
-    
-    # Create a flat config file without descriptions
-    config = {k: v['value'] for k, v in config.items()}
+            config[arg_name] = getattr(args, arg_name)
 
     print('\n--- load options ---')
     for name, value in sorted(config.items()):
