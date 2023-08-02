@@ -1,13 +1,13 @@
 # code adapted from https://github.com/HsinYingLee/MDMM
 
-import numpy as np
+import functools
 
+import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
-import functools
-from torch.optim import lr_scheduler
 import torch.nn.functional as F
+from torch.autograd import Variable
+from torch.optim import lr_scheduler
 
 
 ####################################################################

@@ -1,8 +1,10 @@
+from typing import Optional
+
 import torch
 import torch.nn as nn
+
 from models.aggregators import BaseAggregator
 from models.aggregators.model_utils import MILAttention
-from typing import Optional
 
 
 class AttentionMIL(BaseAggregator):

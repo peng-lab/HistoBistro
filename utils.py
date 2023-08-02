@@ -1,10 +1,12 @@
 import importlib
 from pathlib import Path
+
 import numpy as np
 import pandas as pd
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
+
 from models.aggregators.aggregator import BaseAggregator
 
 
@@ -71,10 +73,10 @@ def get_scheduler(name, optimizer, *args, **kwargs):
     else:
         # Raise an exception if the name is not valid
         raise ValueError(f"Invalid scheduler name: {name}")
-    
+
 
 def save_results(cfg, results, base_path, train_cohorts, test_cohorts, mode="test"):
-    # save results to dataframe 
+    # save results to dataframe
     labels_per_fold = list(results[test_cohorts[0]][0].keys())
     labels_mean_std = [f'{l} {v}' for l in labels_per_fold for v in ['mean', 'std']]
     labels = [f'{l}_fold{k}' for l in labels_per_fold for k in range(len(results[test_cohorts[0]]))]
@@ -102,7 +104,7 @@ def save_results(cfg, results, base_path, train_cohorts, test_cohorts, mode="tes
     results_df['Algorithm'] = cfg.model
     results_df['Comments'] = f'{cfg.logging_name}, random state for splitting {cfg.seed}'
     # reorder columns and save to csv
-    cols = results_df.columns.to_list()[num_cols:] + results_df.columns.to_list()[:num_cols]        
+    cols = results_df.columns.to_list()[num_cols:] + results_df.columns.to_list()[:num_cols]
     results_df = results_df[cols]
     # append to existing dataframe
     if Path(base_path / f'results_{cfg.logging_name}.csv').is_file():

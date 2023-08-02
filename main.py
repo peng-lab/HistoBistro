@@ -1,9 +1,8 @@
 import argparse
 import os
-from pathlib import Path
 import warnings
+from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
@@ -18,7 +17,6 @@ from classifier import ClassifierLightning
 from data import MILDataset, get_multi_cohort_df
 from options import Options
 from utils import save_results
-
 
 """
 train, validate, and test a model with nested k-fold cross validation with in-domain test set and external test set.

@@ -1,7 +1,7 @@
 import argparse
 import os
-from pathlib import Path
 import warnings
+from pathlib import Path
 
 import pandas as pd
 import pytorch_lightning as pl
@@ -17,7 +17,6 @@ from classifier import ClassifierLightning
 from data import MILDataset, get_multi_cohort_df
 from options import Options
 from utils import save_results
-
 
 """
 train and validate a model with nested k-fold cross validation without evaluating on the test set.
@@ -37,10 +36,11 @@ where
 # filter out UserWarnings from the torchmetrics package
 warnings.filterwarnings("ignore", category=UserWarning)
 
+
 def main(cfg):
     cfg.seed = torch.randint(0, 1000, (1, )).item() if cfg.seed is None else cfg.seed
     pl.seed_everything(cfg.seed, workers=True)
-    
+
     # --------------------------------------------------------
     # set up paths
     # --------------------------------------------------------
@@ -58,10 +58,15 @@ def main(cfg):
     # --------------------------------------------------------
     # load data
     # --------------------------------------------------------
-    
+
     print('\n--- load dataset ---')
     data, clini_info = get_multi_cohort_df(
-        cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
+        cfg.data_config,
+        cfg.cohorts, [cfg.target],
+        cfg.label_dict,
+        norm=cfg.norm,
+        feats=cfg.feats,
+        clini_info=cfg.clini_info
     )
     cfg.clini_info = clini_info
     cfg.input_dim += len(cfg.clini_info.keys())
@@ -69,17 +74,17 @@ def main(cfg):
     train_cohorts = f'{", ".join(cfg.cohorts)}'
     val_cohorts = [train_cohorts]
     results_validation = {t: [] for t in val_cohorts}
-    
+
     # --------------------------------------------------------
     # k-fold cross validation
     # --------------------------------------------------------
-    
+
     # load fold directory from data_config
     with open(cfg.data_config, 'r') as f:
         data_config = yaml.safe_load(f)
         fold_path = Path(data_config[train_cohorts]['folds']) / f"{cfg.target}_{cfg.folds}folds"
         fold_path.mkdir(parents=True, exist_ok=True)
-        
+
     # split data stratified by the labels
     skf = StratifiedKFold(n_splits=cfg.folds, shuffle=True, random_state=cfg.seed)
     patient_df = data.groupby('PATIENT').first().reset_index()
@@ -93,7 +98,11 @@ def main(cfg):
             train_idxs = pd.read_csv(fold_path / f'fold{k}_train.csv', index_col='Unnamed: 0').index
             val_idxs = pd.read_csv(fold_path / f'fold{k}_val.csv', index_col='Unnamed: 0').index
         else:
-            train_idxs, val_idxs = train_test_split(splits[k][0], stratify=patient_df.iloc[splits[k][0]][target_stratisfy], random_state=cfg.seed)
+            train_idxs, val_idxs = train_test_split(
+                splits[k][0],
+                stratify=patient_df.iloc[splits[k][0]][target_stratisfy],
+                random_state=cfg.seed
+            )
             patient_df['PATIENT'][train_idxs].to_csv(fold_path / f'fold{k}_train.csv')
             patient_df['PATIENT'][val_idxs].to_csv(fold_path / f'fold{k}_val.csv')
             patient_df['PATIENT'][splits[k][1]].to_csv(fold_path / f'fold{k}_test.csv')
@@ -109,18 +118,28 @@ def main(cfg):
         )
         print(f'num training samples in fold {k}: {len(train_dataset)}')
         train_dataloader = DataLoader(
-            dataset=train_dataset, batch_size=cfg.bs, shuffle=True, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
+            dataset=train_dataset,
+            batch_size=cfg.bs,
+            shuffle=True,
+            num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')),
+            pin_memory=True
         )
         if len(train_dataset) < cfg.val_check_interval:
             cfg.val_check_interval = len(train_dataset)
         if cfg.lr_scheduler == 'OneCycleLR':
             cfg.lr_scheduler_config['total_steps'] = cfg.num_epochs * len(train_dataloader)
-        
+
         # validation dataset
-        val_dataset = MILDataset(data, val_idxs, [cfg.target], norm=norm_val, clini_info=cfg.clini_info)
+        val_dataset = MILDataset(
+            data, val_idxs, [cfg.target], norm=norm_val, clini_info=cfg.clini_info
+        )
         print(f'num validation samples in fold {k}: {len(val_dataset)}')
         val_dataloader = DataLoader(
-            dataset=val_dataset, batch_size=1, shuffle=False, num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')), pin_memory=True
+            dataset=val_dataset,
+            batch_size=1,
+            shuffle=False,
+            num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')),
+            pin_memory=True
         )
 
         # class weighting for binary classification
@@ -131,13 +150,13 @@ def main(cfg):
         # --------------------------------------------------------
         # model
         # --------------------------------------------------------
-        
+
         model = ClassifierLightning(cfg)
 
         # --------------------------------------------------------
         # logging
         # --------------------------------------------------------
-        
+
         logger = WandbLogger(
             project=cfg.project,
             name=f'{cfg.logging_name}_fold{k}',
@@ -155,7 +174,7 @@ def main(cfg):
         # --------------------------------------------------------
         # model saving
         # --------------------------------------------------------
-        
+
         checkpoint_callback = ModelCheckpoint(
             monitor='auroc/val' if cfg.stop_criterion == 'auroc' else 'loss/val',
             dirpath=model_path,
@@ -167,7 +186,7 @@ def main(cfg):
         # --------------------------------------------------------
         # set up trainer
         # --------------------------------------------------------
-        
+
         trainer = pl.Trainer(
             logger=[logger, csv_logger],
             accelerator='auto',
@@ -178,25 +197,25 @@ def main(cfg):
             check_val_every_n_epoch=None,
             enable_model_summary=False,
         )
-        
+
         # --------------------------------------------------------
         # training
         # --------------------------------------------------------
 
         if Path(model_path / f'best_model_{cfg.logging_name}_fold{k}.pth').exists():
             pass
-        else: 
+        else:
             results_val = trainer.fit(
                 model,
                 train_dataloader,
                 val_dataloader,
             )
             logger.log_table('results/val', results_val)
-        
+
         # --------------------------------------------------------
         # validating
         # --------------------------------------------------------
-        
+
         print("Evaluating: ", val_cohorts)
         results_val_final = trainer.validate(
             model,
@@ -204,16 +223,17 @@ def main(cfg):
             ckpt_path='best',
         )
         results_validation[val_cohorts[0]].append(results_val_final[0])
-            
+
         wandb.finish()  # required for new wandb run in next fold
-            
+
     # save results to csv file
     save_results(cfg, results_validation, base_path, train_cohorts, val_cohorts, mode="val")
+
 
 if __name__ == '__main__':
     parser = Options()
     args = parser.parse()
-    
+
     # Load the configuration from the YAML file
     with open(args.config_file, 'r') as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
@@ -226,6 +246,6 @@ if __name__ == '__main__':
     print('\n--- load options ---')
     for name, value in sorted(config.items()):
         print(f'{name}: {str(value)}')
-    
+
     config = argparse.Namespace(**config)
     main(config)

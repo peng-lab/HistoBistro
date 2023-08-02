@@ -1,5 +1,6 @@
-import dgl
 import random
+
+import dgl
 import torch
 
 from attentionmil import AttentionMIL

@@ -1,9 +1,12 @@
 import torch
 import torch.nn as nn
 from einops import repeat
+
 from models.aggregators.aggregator import BaseAggregator
-from models.aggregators.model_utils import PreNorm, SinusoidalPositionalEmbedding, Attention, FeedForward
-from models.aggregators.positional_encodings import ConcatEmbedding, CoordinateEmbedding, PositionalEncoding2D
+from models.aggregators.model_utils import Attention, FeedForward, PreNorm
+from models.aggregators.positional_encodings import (ConcatEmbedding,
+                                                     CoordinateEmbedding,
+                                                     PositionalEncoding2D)
 
 
 class TransformerBlocks(nn.Module):

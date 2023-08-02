@@ -1,9 +1,11 @@
 import torch
-from torch import nn
 from einops import rearrange, repeat
 from einops.layers.torch import Reduce
+from torch import nn
+
 from models.aggregators import BaseAggregator
-from models.aggregators.model_utils import cache_fn, fourier_encode, PreNorm, FeedForward, PerceiverAttention
+from models.aggregators.model_utils import (FeedForward, PerceiverAttention,
+                                            PreNorm, cache_fn, fourier_encode)
 
 
 class Perceiver(BaseAggregator):
