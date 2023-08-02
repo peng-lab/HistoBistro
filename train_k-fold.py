@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 import warnings
 
-import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
@@ -46,7 +45,6 @@ def main(cfg):
     # set up paths
     # --------------------------------------------------------
 
-    # saving locations
     base_path = Path(cfg.save_dir)
     cfg.logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if cfg.name != 'debug' else 'debug'
     base_path = base_path / cfg.logging_name
@@ -60,6 +58,7 @@ def main(cfg):
     # --------------------------------------------------------
     # load data
     # --------------------------------------------------------
+    
     print('\n--- load dataset ---')
     data, clini_info = get_multi_cohort_df(
         cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
@@ -74,6 +73,7 @@ def main(cfg):
     # --------------------------------------------------------
     # k-fold cross validation
     # --------------------------------------------------------
+    
     # load fold directory from data_config
     with open(cfg.data_config, 'r') as f:
         data_config = yaml.safe_load(f)
@@ -131,11 +131,13 @@ def main(cfg):
         # --------------------------------------------------------
         # model
         # --------------------------------------------------------
+        
         model = ClassifierLightning(cfg)
 
         # --------------------------------------------------------
         # logging
         # --------------------------------------------------------
+        
         logger = WandbLogger(
             project=cfg.project,
             name=f'{cfg.logging_name}_fold{k}',
@@ -153,6 +155,7 @@ def main(cfg):
         # --------------------------------------------------------
         # model saving
         # --------------------------------------------------------
+        
         checkpoint_callback = ModelCheckpoint(
             monitor='auroc/val' if cfg.stop_criterion == 'auroc' else 'loss/val',
             dirpath=model_path,
@@ -193,6 +196,7 @@ def main(cfg):
         # --------------------------------------------------------
         # validating
         # --------------------------------------------------------
+        
         print("Evaluating: ", val_cohorts)
         results_val_final = trainer.validate(
             model,

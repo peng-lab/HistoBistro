@@ -21,7 +21,7 @@ from optuna.integration import PyTorchLightningPruningCallback
 """
 run file with 
 
-python tune.py --config_file config_staging.yaml --num_epochs xy
+python tune.py --config_file config.yaml --num_epochs xy
 
 in case of the following error:
 AttributeError: 'Trainer' object has no attribute 'training_type_plugin'
