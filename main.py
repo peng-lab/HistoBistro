@@ -60,6 +60,7 @@ def main(cfg):
     # --------------------------------------------------------
     # load data
     # --------------------------------------------------------
+    
     print('\n--- load dataset ---')
     data, clini_info = get_multi_cohort_df(
         cfg.data_config, cfg.cohorts, [cfg.target], cfg.label_dict, norm=cfg.norm, feats=cfg.feats, clini_info=cfg.clini_info
@@ -95,6 +96,7 @@ def main(cfg):
     # --------------------------------------------------------
     # k-fold cross validation
     # --------------------------------------------------------
+    
     # load fold directory from data_config
     with open(cfg.data_config, 'r') as f:
         data_config = yaml.safe_load(f)
