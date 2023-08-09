@@ -108,6 +108,7 @@ def main(cfg):
     patient_df = data.groupby('PATIENT').first().reset_index()
     target_stratisfy = cfg.target if type(cfg.target) is str else cfg.target[0]
     splits = skf.split(patient_df, patient_df[target_stratisfy])
+    splits = list(splits)
 
     for k in range(cfg.folds):
         # read split from csv-file if exists already else save split to csv
