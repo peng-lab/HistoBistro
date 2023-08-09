@@ -1,0 +1,54 @@
+# logging options
+save_dir: .logs/MSI_transformer
+project: MSI_transformer
+name: debug
+
+# task definition
+data_config: data_config.yaml
+task: binary
+target: isMSIH
+num_classes: 1
+cohorts: []
+ext_cohorts: []
+clini_info: {}
+seed: null
+label_dict:
+  Not mut.: 0
+  Mutat.: 1
+  nonMSIH: 0
+  MSIH: 1
+  WT: 0
+  MUT: 1
+  wt: 0
+  MT: 1
+  # clinical information
+  left: 1
+  right: 0
+  female: 1
+  male: 0
+
+# model options
+model: Transformer
+model_config:
+  heads: 8
+  dim_head: 64
+  dim: 512
+  mlp_dim: 512
+norm: histaugan
+feats: ctranspath
+input_dim: 768
+num_tiles: -1
+pad_tiles: false
+
+# training options
+folds: 5
+num_epochs: 8
+criterion:  BCEWithLogitsLoss 
+optimizer: AdamW
+lr_scheduler: null
+lr: 2.0e-05
+wd: 2.0e-05
+bs: 1
+stop_criterion: loss
+val_check_interval: 1000
+num_samples: null
