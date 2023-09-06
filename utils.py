@@ -87,7 +87,7 @@ def save_results(cfg, results, base_path, train_cohorts, test_cohorts, mode="tes
         # calculate mean and std over folds
         folds = []
         for l in labels_per_fold:
-            fold = [results[c][k][l] for k in range(cfg.folds)]
+            fold = [results[c][k][l] for k in range(len(results[test_cohorts[0]]))]
             folds.extend(fold)
             fold = np.array(fold)
             data[idx_c].extend((fold.mean(), fold.std()))
@@ -102,7 +102,7 @@ def save_results(cfg, results, base_path, train_cohorts, test_cohorts, mode="tes
     results_df['Normalization'] = cfg.norm
     results_df['Feature Extraction'] = cfg.feats
     results_df['Algorithm'] = cfg.model
-    results_df['Comments'] = f'{cfg.logging_name}, random state for splitting {cfg.seed}'
+    results_df['Comments'] = f'random state for splitting {cfg.seed}'
     # reorder columns and save to csv
     cols = results_df.columns.to_list()[num_cols:] + results_df.columns.to_list()[:num_cols]
     results_df = results_df[cols]

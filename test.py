@@ -29,40 +29,25 @@ def main(cfg):
     cfg.seed = torch.randint(0, 1000, (1, )).item() if cfg.seed is None else cfg.seed
     pl.seed_everything(cfg.seed, workers=True)
 
-    base_path = Path(cfg.save_dir)
+    model_path = Path(cfg.model_path)
+    cfg.name = f'test_{model_path.stem}' if cfg.name is None else cfg.name
     cfg.logging_name = f'{cfg.name}_{cfg.model}_{"-".join(cfg.cohorts)}_{cfg.norm}_{cfg.target}' if cfg.name != 'debug' else 'debug'
-    base_path = base_path / cfg.logging_name
-    base_path.mkdir(parents=True, exist_ok=True)
-    model_path = base_path / 'models'
-    result_path = base_path / 'results'
+
+    result_path = Path(cfg.save_dir) / cfg.logging_name
     result_path.mkdir(parents=True, exist_ok=True)
 
     norm_test = 'raw' if cfg.norm in ['histaugan', 'efficient_histaugan'] else cfg.norm
 
     # --------------------------------------------------------
-    # load data
+    # load external test data
     # --------------------------------------------------------
 
     print('\n--- load dataset ---')
-    data, clini_info = get_multi_cohort_df(
-        cfg.data_config,
-        cfg.cohorts, [cfg.target],
-        cfg.label_dict,
-        norm=cfg.norm,
-        feats=cfg.feats,
-        clini_info=cfg.clini_info
-    )
-    cfg.clini_info = clini_info
-    cfg.input_dim += len(cfg.clini_info.keys())
-    for cohort in cfg.cohorts:
-        if cohort in cfg.ext_cohorts:
-            cfg.ext_cohorts.pop(cfg.ext_cohorts.index(cohort))
 
-    train_cohorts = f'{", ".join(cfg.cohorts)}'
-    test_cohorts = [train_cohorts, *cfg.ext_cohorts]
+    test_cohorts = [*cfg.ext_cohorts]
     results = {t: [] for t in test_cohorts}
 
-    test_ext_dataloader = []
+    test_dataloader = []
     for ext in cfg.ext_cohorts:
         test_data, clini_info = get_multi_cohort_df(
             cfg.data_config, [ext], [cfg.target],
@@ -71,89 +56,57 @@ def main(cfg):
             feats=cfg.feats,
             clini_info=cfg.clini_info
         )
-        dataset_ext = MILDataset(
+        test_dataset = MILDataset(
             test_data,
             list(range(len(test_data))),
             [cfg.target],
             clini_info=clini_info,
             norm=norm_test,
         )
-        test_ext_dataloader.append(
+        test_dataloader.append(
             DataLoader(
-                dataset=dataset_ext,
-                batch_size=1,
-                shuffle=False,
-                num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')),
-                pin_memory=True
-            )
-        )
-
-    print(f'training cohorts: {train_cohorts}')
-    print(f'testing cohorts:  {cfg.ext_cohorts}')
-
-    # --------------------------------------------------------
-    # k-fold cross validation
-    # --------------------------------------------------------
-
-    # load fold directory from data_config
-    with open(cfg.data_config, 'r') as f:
-        data_config = yaml.safe_load(f)
-        fold_path = Path(data_config[train_cohorts]['folds']) / f"{cfg.target}_{cfg.folds}folds"
-        fold_path.mkdir(parents=True, exist_ok=True)
-
-    for k in range(cfg.folds):
-        # read split from csv-file if exists already else save split to csv
-        if Path(fold_path / f'fold{k}_test.csv').exists():
-            test_idxs = pd.read_csv(fold_path / f'fold{k}_test.csv', index_col='Unnamed: 0').index
-
-            # test dataset (in-domain)
-            test_dataset = MILDataset(
-                data, test_idxs, [cfg.target], norm=norm_test, clini_info=cfg.clini_info
-            )
-            print(f'num test samples in fold {k}: {len(test_dataset)}')
-            test_dataloader = DataLoader(
                 dataset=test_dataset,
                 batch_size=1,
                 shuffle=False,
                 num_workers=int(os.environ.get('SLURM_CPUS_PER_TASK', '1')),
                 pin_memory=True
             )
-
-        # --------------------------------------------------------
-        # model
-        # --------------------------------------------------------
-        model = ClassifierLightning(cfg)
-
-        # --------------------------------------------------------
-        # testing
-        # --------------------------------------------------------
-
-        trainer = pl.Trainer(
-            accelerator='auto',
-            devices=1,
-            max_epochs=cfg.num_epochs,
-            val_check_interval=cfg.val_check_interval,
-            check_val_every_n_epoch=None,
-            enable_model_summary=False,
         )
 
-        checkpoint_path = model_path / f'best_model_{cfg.logging_name}_fold{k}.ckpt'
-        assert checkpoint_path.exists(), f'best model file {checkpoint_path} does not exist'
+    print(f'testing cohorts:  {cfg.ext_cohorts}')
 
-        test_cohorts_dataloader = [test_dataloader, *test_ext_dataloader]
-        for idx in range(len(test_cohorts)):
-            print("Testing: ", test_cohorts[idx])
-            results_test = trainer.test(
-                model,
-                test_cohorts_dataloader[idx],
-                ckpt_path=checkpoint_path,
-            )
-            results[test_cohorts[idx]].append(results_test[0])
-            # save patient predictions to outputs csv file
-            model.outputs.to_csv(result_path / f'fold{k}' / f'outputs_{test_cohorts[idx]}.csv')
+    # --------------------------------------------------------
+    # model
+    # --------------------------------------------------------
+    cfg.pos_weight = torch.ones(1)
+    model = ClassifierLightning(cfg)
+    weights = torch.load(model_path)
+    model.load_state_dict(weights)
+
+    # --------------------------------------------------------
+    # testing
+    # --------------------------------------------------------
+
+    trainer = pl.Trainer(
+        accelerator='auto',
+        devices=1,
+        enable_model_summary=False,
+    )
+
+    test_cohorts_dataloader = [*test_dataloader]
+    for idx in range(len(test_cohorts)):
+        print("Testing: ", test_cohorts[idx])
+        results_test = trainer.test(
+            model,
+            test_cohorts_dataloader[idx],
+            # ckpt_path=model_path,
+        )
+        results[test_cohorts[idx]].append(results_test[0])
+        # save patient predictions to outputs csv file
+        model.outputs.to_csv(result_path / f'outputs_{test_cohorts[idx]}.csv')
 
     # save results to csv file
-    save_results(cfg, results, base_path, train_cohorts, test_cohorts)
+    save_results(cfg, results, result_path, 'CRCCancerCell', test_cohorts)
 
 
 if __name__ == '__main__':

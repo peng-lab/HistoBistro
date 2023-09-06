@@ -6,6 +6,7 @@ Pipeline for weakly-supervised learning on histology images. The pipeline contai
 
 ## Repository structure
 ```
+├── CancerCellCRCTransformer        # materials for the publication
 ├── models                          # all model files
 │   ├── aggregators
 │   │   ├── __init__.py  
@@ -13,22 +14,21 @@ Pipeline for weakly-supervised learning on histology images. The pipeline contai
 │   │   ├── attentionmil.py         # model by Ilse et al., 2018
 │   │   ├── lamil.py                # model by Reisenbüchler er al., 2022
 │   │   ├── model_utils.py          # common layers and functions used in the other models
-│   │   ├── perceiver.py
+│   │   ├── perceiver.py            # model by Jaegle et al., 2021
 │   │   ├── test_aggregators.py     # test new aggregators
-│   │   ├── transformer.py
+│   │   ├── transformer.py          # CancerCellCRCTransformer model
 │   │   ├── transmil.py             # model by Shao et al. 2021
-│   ├── histaugan                   # model from Wagner et al., 2021, for stain augmentation
-│   │   ├── __init__.py  
-│   │   ├── augment.py  
-│   │   ├── model.py  
-│   │   ├── networks.py  
 ├── classifier.py                   # lightning module for feature classification
 ├── config.yaml                     # config file for training
 ├── data.py                         # dataset class and helper functions
 ├── environment.yaml                # config file for conda environment
 ├── main.py                         # train and test models
+├── train_k-fold.py                 # train models with k-fold cross validation
+├── test_k-fold.py                  # test models with k-fold cross validation
+├── test.py                         # test models (e.g., CancerCellCRCTransformer models)
 ├── options.py                      # argument parsing, overrides config file when arguments are given
-├── run.sh
+├── Evaluations.ipynb               # visualize attention and classification score heatmaps
+├── Visualizations.ipynb            # plot metric curves (ROC, PRC) and analyze clinicopathological features
 ├── utils.py                        # get files and other utils
 ```
 
@@ -66,7 +66,7 @@ conda env create --file environment.yaml
 * folder with features as `.h5-files`. Filenames correspond to filenames in `slide.csv`
 
 
-## Training and testing
+## Training
 
 You can train your model on a multi-centric dataset with the following k-fold cross validation (k=5) scheme where `--` (train) `**` (val), and `##` (test).
 ```
@@ -83,7 +83,14 @@ python train_k-fold.py --name <name> --data_config <path/to/data_config.yaml> --
 ```
 and test it on the in-domain test set and external cohorts by running
 ```
-python test.py --name <name> --data_config <path/to/data_config.yaml> --config <path/to/config.yaml>
+python test_k-fold.py --name <name> --data_config <path/to/data_config.yaml> --config <path/to/config.yaml>
+```
+
+## Testing
+
+You can test a given model with the following command:
+```
+python test.py --model_path <path/to/model.ckpt> --name <custom-name> --config_file <path/to/config.yaml> --data_config <path/to/data_config.yaml>
 ```
 
 ## Publications

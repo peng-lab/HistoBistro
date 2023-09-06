@@ -42,7 +42,7 @@ class Options:
         self.parser.add_argument('--bs', type=int, help='batch size during training')
         self.parser.add_argument('--stop_criterion', type=str, help='metric for choosing best model')
         self.parser.add_argument('--val_check_interval', type=int, default=500, help='interval to evaluate on validation set')
-        self.parser.add_argument('--resume', type=str, help='path to trained model for evaluation')
+        self.parser.add_argument('--model_path', type=str, help='path to trained model for evaluation')
         self.parser.add_argument('--debug', type=bool, help='debug flag, turns off login etc.')
         self.parser.add_argument('--num_samples', type=int, help='for experiment to analyze number of samples')
 

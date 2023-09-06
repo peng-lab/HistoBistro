@@ -1,7 +1,7 @@
 # logging options
 save_dir: .logs/MSI_transformer
 project: MSI_transformer
-name: debug
+name: null
 
 # task definition
 data_config: data_config.yaml
