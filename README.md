@@ -2,7 +2,7 @@
 
 Pipeline for weakly-supervised learning on histology images. The pipeline contains various models for multiple instance learning with different aggregation models. Based on Pytorch Lightning. All aggregation modules can be loaded as model files in the classifier lightning module. Loss, models, optimizers, and schedulers can be specified as strings according to the PyTorch name in the config file.
 
-![](CancerCellCRCTransformer/model.png)
+![](CancerCellCRCTransformer/visualizations/model.png)
 
 ## Repository structure
 ```
@@ -93,19 +93,19 @@ You can test a given model with the following command:
 python test.py --model_path <path/to/model.ckpt> --name <custom-name> --config_file <path/to/config.yaml> --data_config <path/to/data_config.yaml>
 ```
 
+You can find the models for **MSI high**, **BRAF**, and **KRAS** prediction from the publication "Transformer-based biomarker prediction from colorectal cancer histology: A large-scale multicentric study" trained on the multicentric cohort in the folder `CancerCellCRCTransformer/trained_models` in this repo.
+
 ## Publications
 
 Information to publications based on this repository are grouped in the respective folders. Find more detailed information in the README.md files in the respective folders.
 
-If you consider this useful for your research, please cite the following preprint:
+If you consider this useful for your research, please cite our paper:
 ```
-@misc{wagner2023fully,
-      title={Fully transformer-based biomarker prediction from colorectal cancer histology: a large-scale multicentric study}, 
-      author={Sophia J. Wagner and Daniel Reisenbüchler and Nicholas P. West and Jan Moritz Niehues and Gregory Patrick Veldhuizen and Philip Quirke and Heike I. Grabsch and Piet A. van den Brandt and Gordon G. A. Hutchins and Susan D. Richman and Tanwei Yuan and Rupert Langer and Josien Christina Anna Jenniskens and Kelly Offermans and Wolfram Mueller and Richard Gray and Stephen B. Gruber and Joel K. Greenson and Gad Rennert and Joseph D. Bonner and Daniel Schmolze and Jacqueline A. James and Maurice B. Loughrey and Manuel Salto-Tellez and Hermann Brenner and Michael Hoffmeister and Daniel Truhn and Julia A. Schnabel and Melanie Boxberg and Tingying Peng and Jakob Nikolas Kather},
-      year={2023},
-      eprint={2301.09617},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
+@article{wagner2023transformer,
+  title={Transformer-based biomarker prediction from colorectal cancer histology: A large-scale multicentric study},
+  author={Wagner, Sophia J and Reisenb{\"u}chler, Daniel and West, Nicholas P and Niehues, Jan Moritz and Zhu, Jiefu and Foersch, Sebastian and Veldhuizen, Gregory Patrick and Quirke, Philip and Grabsch, Heike I and van den Brandt, Piet A and others},
+  journal={Cancer Cell},
+  publisher={Elsevier}
 }
 ```
 
