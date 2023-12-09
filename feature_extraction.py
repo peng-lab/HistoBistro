@@ -28,26 +28,26 @@ parser = argparse.ArgumentParser(description="Feature extraction")
 parser.add_argument(
     "--slide_path",
     help="path of slides to extract features from",
-    default="/mnt/ceph_vol/test_data_manu",
+    default="/mnt/ceph_vol/raw_data/2021",
     type=str,
 )
 parser.add_argument(
     "--save_path",
     help="path to save everything",
-    default="/mnt/ceph_vol/features/test_manu/",
+    default="/mnt/ceph_vol/features/finetune/",
     type=str,
 )
 parser.add_argument(
     "--file_extension",
     help="file extension the slides are saved under, e.g. tiff",
-    default=".ndpi",
+    default=".czi",
     type=str,
 )
 parser.add_argument(
     "--models",
     help="select model ctranspath, retccl, all",
     nargs="+",
-    default=["ctranspath"],
+    default=[],
     type=str,
 )
 parser.add_argument(
@@ -61,7 +61,7 @@ parser.add_argument("--patch_size", help="Patch size for saving", default=256, t
 parser.add_argument(
     "--white_thresh",
     help="if all RGB pixel values are larger than this value, the pixel is considered as white/background",
-    default=[170, 185, 175],
+    default=[175, 190, 178],
     nargs='+',
     type=int,
 )
@@ -92,7 +92,7 @@ parser.add_argument(
 parser.add_argument(
     "--downscaling_factor",
     help="only used if >0, overrides manual resolution. needed if resolution not given",
-    default=4,
+    default=8,
     type=float,
 )
 parser.add_argument(
@@ -270,6 +270,7 @@ def process_row(
                 im.save(
                     Path(args.save_path)
                     / "patches"
+                    /str(args.downscaling_factor)
                     / slide_name
                     / f"{slide_name}_patch_{scn}_{x}_{y}.png"
                 )
@@ -337,7 +338,7 @@ def extract_features(
     coords = pd.DataFrame({"scn": [], "x": [], "y": []}, dtype=int)
 
     if args.save_patch_images:
-        (Path(args.save_path) / "patches" / slide_name).mkdir(
+        (Path(args.save_path) / "patches" / str(args.downscaling_factor)/slide_name).mkdir(
             parents=True, exist_ok=True
         )
 
@@ -385,11 +386,12 @@ def extract_features(
                     scene_coords = pd.concat(
                         [scene_coords, patches_coords], ignore_index=True
                     )
-        patch_feats = patches_to_feature(wsi, scene_coords, model_dicts, device)
         coords = pd.concat([coords, scene_coords], ignore_index=True)
 
-        for key in patch_feats.keys():
-            feats[key].extend(patch_feats[key])
+        if len(model_dicts)>0:
+            patch_feats = patches_to_feature(wsi, scene_coords, model_dicts, device)
+            for key in patch_feats.keys():
+                feats[key].extend(patch_feats[key])
 
         # saves tiling preview on slide in desired size
         if args.save_tile_preview:
@@ -399,7 +401,8 @@ def extract_features(
             save_qupath_annotation(args, slide_name, scn, coords, annotation_path)
 
     # Write data to HDF5
-    save_hdf5(args, slide_name, coords, feats, orig_sizes)
+    if len(model_dicts)>0:
+        save_hdf5(args, slide_name, coords, feats, orig_sizes)
 
 
 if __name__ == "__main__":
