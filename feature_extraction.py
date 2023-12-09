@@ -57,7 +57,7 @@ parser.add_argument(
     default=[0],
     type=int,
 )
-parser.add_argument("--patch_size", help="Patch size for saving", default=256, type=int)
+parser.add_argument("--patch_size", help="Patch size for saving", default=512, type=int)
 parser.add_argument(
     "--white_thresh",
     help="if all RGB pixel values are larger than this value, the pixel is considered as white/background",
@@ -92,7 +92,7 @@ parser.add_argument(
 parser.add_argument(
     "--downscaling_factor",
     help="only used if >0, overrides manual resolution. needed if resolution not given",
-    default=8,
+    default=4,
     type=float,
 )
 parser.add_argument(
