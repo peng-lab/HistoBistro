@@ -93,7 +93,7 @@ parser.add_argument(
 parser.add_argument(
     "--downscaling_factor",
     help="only used if >0, overrides manual resolution. needed if resolution not given",
-    default=2,
+    default=0,
     type=float,
 )
 parser.add_argument(
