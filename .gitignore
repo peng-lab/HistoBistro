@@ -6,3 +6,5 @@ h5_files/*
 **.pt
 **.pth
 *.checkpoints*
+*.csv
+.gitignore

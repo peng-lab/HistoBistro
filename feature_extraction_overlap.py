@@ -21,20 +21,16 @@ from utils.utils import (bgr_format, get_driver, get_scaling, save_hdf5,
 
 parser = argparse.ArgumentParser(description="Feature extraction")
 
-# 20-041_K6_vK
-# 20-069_K3_vK
-# 20-009_K6_vK
-
 parser.add_argument(
     "--slide_path",
     help="path of slides to extract features from",
-    default="/mnt/ceph_vol/raw_data/2021",
+    default="/mnt/ceph_vol/raw_data/2020",
     type=str,
 )
 parser.add_argument(
     "--save_path",
     help="path to save everything",
-    default="/mnt/ceph_vol/features/overlap_test/",
+    default="/mnt/ceph_vol/features/overlap_ait/",
     type=str,
 )
 parser.add_argument(
@@ -105,23 +101,22 @@ parser.add_argument(
 parser.add_argument(
     "--save_tile_preview",
     help="set True if you want nice pictures",
-    default=True,
-    type=bool,
+    action='store_true',
 )
+
 parser.add_argument(
     "--save_patch_images",
     help="True if each patch should be saved as an image",
-    default=False,
-    type=bool,
+    action='store_true',
 )
 parser.add_argument(
     "--preview_size", help="size of tile_preview", default=4096, type=int
 )
-parser.add_argument("--batch_size", default=16, type=int)
+parser.add_argument("--batch_size", default=128, type=int)
 parser.add_argument(
     "--exctraction_list",
     help="if only a subset of the slides should be extracted save their names in a csv",
-    default='/home/ubuntu/idkidc/extraction_list.csv', #"/home/ubuntu/idkidc/extraction_list.csv"
+    default='/home/ubuntu/HistoBistro/extraction_list20.csv', #"/home/ubuntu/idkidc/extraction_list.csv"
     type=str,
 )  #
 parser.add_argument(
@@ -172,7 +167,7 @@ def main(args):
     slide_files = sorted(Path(args.slide_path).glob(f"**/*{args.file_extension}"))
 
     if bool(args.exctraction_list) is not False:
-        to_extract = pd.read_csv(args.exctraction_list).iloc[:, 0].tolist()
+        to_extract = pd.read_csv(args.exctraction_list,header=None).iloc[:, 0].tolist()
         slide_files = [file for file in slide_files if file.name.split("_")[0] +"_"+ file.name.split("_")[1] in to_extract]
 
     # filter out slide files using RegEx

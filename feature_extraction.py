@@ -12,6 +12,7 @@ from PIL import Image
 # import cv2
 from torch.utils.data import DataLoader
 from tqdm import tqdm
+import math
 
 
 from dataset import SlideDataset
@@ -34,7 +35,7 @@ parser.add_argument(
 parser.add_argument(
     "--save_path",
     help="path to save everything",
-    default="/mnt/ceph_vol/features/finetune/",
+    default="/mnt/ceph_vol/features/test/",
     type=str,
 )
 parser.add_argument(
@@ -92,25 +93,24 @@ parser.add_argument(
 parser.add_argument(
     "--downscaling_factor",
     help="only used if >0, overrides manual resolution. needed if resolution not given",
-    default=4,
+    default=2,
     type=float,
 )
 parser.add_argument(
     "--save_tile_preview",
     help="set True if you want nice pictures",
-    default=True,
-    type=bool,
+    action='store_true',
 )
+
 parser.add_argument(
     "--save_patch_images",
     help="True if each patch should be saved as an image",
-    default=True,
-    type=bool,
+    action='store_true',
 )
 parser.add_argument(
     "--preview_size", help="size of tile_preview", default=4096, type=int
 )
-parser.add_argument("--batch_size", default=16, type=int)
+parser.add_argument("--batch_size", default=256, type=int)
 parser.add_argument(
     "--exctraction_list",
     help="if only a subset of the slides should be extracted save their names in a csv",
@@ -127,6 +127,13 @@ parser.add_argument(
     "--calc_thresh",
     help="darker colours than this are considered calc",
     default=[40, 40, 40],
+    nargs='+',
+    type=int,
+)
+parser.add_argument(
+    "--split",
+    help="(k,n): split slides into n distinct chunks and process number k. (0,1) for all slides at once. E.g. one urn with (0,2) and one with (1,2) to split data.",
+    default=[0, 1],
     nargs='+',
     type=int,
 )
@@ -169,9 +176,13 @@ def main(args):
         slide_files = [file for file in slide_files if file.name in to_extract]
 
     # filter out slide files using RegEx
-    slide_files = [
-        file for file in slide_files if not re.search("_CR_|_CL_", str(file))
-    ]
+    #slide_files = sorted([
+    #    file for file in slide_files if re.search("-DX", str(file))
+    #])
+    chunk_len=math.ceil(len(slide_files)/args.split[1])
+    start=args.split[0]*chunk_len
+    end=min(start+chunk_len,len(slide_files))
+    slide_files=slide_files[start:end]
 
     # Get model dictionaries
     model_dicts = get_models(args.models)
@@ -348,8 +359,12 @@ def extract_features(
         scene_coords = pd.DataFrame({"scn": [], "x": [], "y": []}, dtype=int)
         scene = slide.get_scene(scn)
         orig_sizes.append(scene.size)
-        scaling = get_scaling(args, scene.resolution[0])
-
+        try:
+            scaling = get_scaling(args, scene.resolution[0])
+        except Exception as e:
+            print(e)
+            print(f"Error determining resolution at slide ", slide_name, scn)
+            break
         # read the scene in the desired resolution
         wsi = scene.read_block(
             size=(int(scene.size[0] // scaling), int(scene.size[1] // scaling))
@@ -359,8 +374,8 @@ def extract_features(
         # wsi=np.transpose(wsi, (1, 0, 2))
 
         # check if RGB or BGR is used and adapt
-        if bgr_format(slide.raw_metadata):
-            wsi = wsi[..., ::-1]
+        #if bgr_format(slide.raw_metadata):
+        #    wsi = wsi[..., ::-1]
             # print("Changed BGR to RGB!")
 
         # Define the main loop that processes all patches
