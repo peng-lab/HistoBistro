@@ -8,3 +8,4 @@ h5_files/*
 *.checkpoints*
 *.csv
 .gitignore
+.vscode/**
