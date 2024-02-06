@@ -5,6 +5,7 @@ h5_files/*
 *.out
 **.pt
 **.pth
+**.ckpt
 *.checkpoints*
 *.csv
 .gitignore

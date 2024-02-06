@@ -377,8 +377,7 @@ def extract_features(
     # initialize HistAuGAN for augmentation
     if args.histaugan:
         print('Initializing HistAuGAN...')
-        # TODO generalize model path
-        histaugan_path = '/lustre/groups/haicu/workspace/sophia.wagner/HistAuGAN-7sites-epoch=10-l1_cc_loss=0.86.ckpt'
+        histaugan_path = './HistAuGAN_TCGA-CRC_7sites.ckpt'
         histaugan = HistAuGAN.load_from_checkpoint(histaugan_path)
         del histaugan.dis1, histaugan.dis2, histaugan.dis_c, histaugan.enc_a
         histaugan.to(device).eval()
