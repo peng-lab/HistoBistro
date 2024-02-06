@@ -251,7 +251,7 @@ def save_qupath_annotation(args: argparse.Namespace, slide_name:str, scn:int, co
         json.dump(features, annotation_file)
 
 
-def save_hdf5(args: argparse.Namespace, slide_name:str , coords: pd.DataFrame, feats:dict, slide_sizes:list[tuple]):
+def save_hdf5(args: argparse.Namespace, slide_name:str , coords: pd.DataFrame, feats: dict, feats_aug: dict, slide_sizes:list[tuple]):
     """
     Save the extracted features and coordinates to an HDF5 file.
     Args:
@@ -259,6 +259,7 @@ def save_hdf5(args: argparse.Namespace, slide_name:str , coords: pd.DataFrame, f
         slide_name (str): Name of the slide file.
         coords (pd.DataFrame): Coordinates of the extracted patches.
         feats (dict): dictionary: modelname: extracted features
+        feats_aug (dict): dictionary: modelname: extracted features with patch-level augmentations
     Returns:
         None
     """
@@ -273,6 +274,8 @@ def save_hdf5(args: argparse.Namespace, slide_name:str , coords: pd.DataFrame, f
             ) as f:
                 f["coords"] = coords.astype("float64")
                 f["feats"] = features
+                if feats_aug is not None:
+                    f["feats_aug"] = feats_aug[model_name]
                 f["args"] = json.dumps(vars(args))
                 f["model_name"] = model_name
                 f["slide_sizes"] = slide_sizes

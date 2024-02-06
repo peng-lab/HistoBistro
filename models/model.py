@@ -9,12 +9,12 @@ from models.resnet_retccl import resnet50 as retccl_res50
 from models.simsalabim import ResNetSimCLR
 from models.sam import build_sam_vit_h,build_sam_vit_b,build_sam_vit_l
 from models.imagebind import imagebind_huge
-from transformers import  Data2VecVisionModel, BeitFeatureExtractor
+from transformers import Data2VecVisionModel, BeitFeatureExtractor
 
 # RetCCL can be downloaded here: https://drive.google.com/drive/folders/1AhstAFVqtTqxeS9WlBpU41BV08LYFUnL?usp=sharing
 # kimianet download: https://kimialab.uwaterloo.ca/kimia/?smd_process_download=1&download_id=4216
 RETCCL_PATH = '/home/ubuntu/run/retccl.pth'
-CTRANSPATH_PATH = '/mnt/ceph_vol/models/ctranspath.pth'
+CTRANSPATH_PATH = '/lustre/groups/shared/users/peng_marr/pretrained_models/ctranspath.pth'
 KIMIANET_PATH = '/mnt/volume/models/KimiaNetPyTorchWeights.pth'
 SIMCLR_LUNG_PATH= '/mnt/volume/models/rushinssimclr.pth' 
 SAM_VIT_H_PATH='/mnt/ceph_vol/models/sam_vit_h_4b8939.pth'

@@ -17,6 +17,8 @@ import math
 
 from dataset import SlideDataset
 from models.model import get_models
+from models.histaugan.model import HistAuGAN
+from models.histaugan.augment import augment
 from utils.utils import (bgr_format, get_driver, get_scaling, save_hdf5,
                          save_qupath_annotation, save_tile_preview, threshold)
 
@@ -136,6 +138,11 @@ parser.add_argument(
     default=[0, 1],
     nargs='+',
     type=int,
+)
+parser.add_argument(
+    "--histaugan", 
+    help="if set, use HistAuGAN for tile augmentation",
+    action='store_true',
 )
 
 
@@ -295,9 +302,10 @@ def process_row(
 
 
 def patches_to_feature(
-    wsi: np.array, coords: pd.DataFrame, model_dicts: list[dict], device: torch.device
+    wsi: np.array, coords: pd.DataFrame, model_dicts: list[dict], device: torch.device, histaugan=None,
 ):
     feats = {model_dict["name"]: [] for model_dict in model_dicts}
+    feats_aug = {model_dict["name"]: [] for model_dict in model_dicts} if histaugan else None
 
     with torch.no_grad():
         for model_dict in model_dicts:
@@ -310,13 +318,25 @@ def patches_to_feature(
                 dataset, batch_size=args.batch_size, num_workers=1, shuffle=False
             )
 
-            for batch in dataloader:
-                features = model(batch.to(device))
-                feats[model_name] = feats[model_name] + (
-                    features.cpu().numpy().tolist()
-                )
+            if histaugan:
+                # add {num_domains} histaugan augmentations with fixed attribute per slide
+                z_attr = torch.randn((histaugan.opts.num_domains, histaugan.dim_attribute)).to(device)
 
-    return feats
+            for batch in dataloader:
+                batch = batch.to(device)
+                if args.histaugan:
+                    batch_aug = []
+                    for d in range(histaugan.opts.num_domains):
+                        domain = torch.eye(histaugan.opts.num_domains)[d].unsqueeze(0).to(device)
+                        with torch.cuda.amp.autocast():
+                            batch = augment(batch, histaugan, domain, z_attr[d].unsqueeze(0))
+                            batch_aug.append(model(batch).cpu().detach())
+                    feats_aug[model_name].append(torch.stack(batch_aug))  # shape: (num_aug, bs, feature_dim)
+
+                features = model(batch.float())
+                feats[model_name] += (features.cpu().numpy().tolist())
+
+    return feats, feats_aug
 
 
 def extract_features(
@@ -346,12 +366,24 @@ def extract_features(
     """
 
     feats = {model_dict["name"]: [] for model_dict in model_dicts}
+    feats_aug = {model_dict["name"]: [] for model_dict in model_dicts} if args.histaugan else None
     coords = pd.DataFrame({"scn": [], "x": [], "y": []}, dtype=int)
 
     if args.save_patch_images:
         (Path(args.save_path) / "patches" / str(args.downscaling_factor)/slide_name).mkdir(
             parents=True, exist_ok=True
         )
+
+    # initialize HistAuGAN for augmentation
+    if args.histaugan:
+        print('Initializing HistAuGAN...')
+        # TODO generalize model path
+        histaugan_path = '/lustre/groups/haicu/workspace/sophia.wagner/HistAuGAN-7sites-epoch=10-l1_cc_loss=0.86.ckpt'
+        histaugan = HistAuGAN.load_from_checkpoint(histaugan_path)
+        del histaugan.dis1, histaugan.dis2, histaugan.dis_c, histaugan.enc_a
+        histaugan.to(device).eval()
+    else:
+        histaugan = None
 
     orig_sizes = []
     # iterate over scenes of the slides
@@ -404,9 +436,11 @@ def extract_features(
         coords = pd.concat([coords, scene_coords], ignore_index=True)
 
         if len(model_dicts)>0:
-            patch_feats = patches_to_feature(wsi, scene_coords, model_dicts, device)
+            patch_feats, patch_feats_aug = patches_to_feature(wsi, scene_coords, model_dicts, device, histaugan)
             for key in patch_feats.keys():
                 feats[key].extend(patch_feats[key])
+                if patch_feats_aug:
+                    feats_aug[key] = torch.concat(patch_feats_aug[key], dim=1).cpu().numpy()
 
         # saves tiling preview on slide in desired size
         if args.save_tile_preview:
@@ -417,7 +451,7 @@ def extract_features(
 
     # Write data to HDF5
     if len(model_dicts)>0:
-        save_hdf5(args, slide_name, coords, feats, orig_sizes)
+        save_hdf5(args, slide_name, coords, feats, feats_aug, orig_sizes)
 
 
 if __name__ == "__main__":
